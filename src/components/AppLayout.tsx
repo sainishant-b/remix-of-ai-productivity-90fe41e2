@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { App } from "@capacitor/app";
+import { StatusBar, Style } from "@capacitor/status-bar";
 import MobileBottomNav from "./MobileBottomNav";
 import CheckInModal from "./CheckInModal";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +13,7 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -28,28 +30,41 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const showBottomNav = location.pathname !== "/auth";
 
   useEffect(() => {
-    // Handle Android back button
+    // Configure status bar for Android
+    const configureStatusBar = async () => {
+      try {
+        await StatusBar.setStyle({ style: Style.Dark });
+        await StatusBar.setBackgroundColor({ color: "#000000" });
+        await StatusBar.setOverlaysWebView({ overlay: false });
+      } catch (error) {
+        // Not running in Capacitor context, ignore
+      }
+    };
+
+    // Handle Android back button with React Router
     const setupBackButton = async () => {
       try {
-        await App.addListener("backButton", ({ canGoBack }) => {
-          if (canGoBack) {
-            window.history.back();
-          } else {
+        await App.addListener("backButton", () => {
+          // Check if on home/dashboard - exit app
+          if (location.pathname === "/" || location.pathname === "/auth") {
             App.exitApp();
+          } else {
+            // Navigate back using React Router
+            navigate(-1);
           }
         });
       } catch (error) {
         // Not running in Capacitor context, ignore
-        console.log("Not running in Capacitor context");
       }
     };
 
+    configureStatusBar();
     setupBackButton();
 
     return () => {
       App.removeAllListeners().catch(() => {});
     };
-  }, []);
+  }, [location.pathname, navigate]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
