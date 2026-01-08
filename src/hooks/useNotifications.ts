@@ -223,6 +223,41 @@ export const useNotifications = (): UseNotificationsReturn => {
         return false;
       }
 
+      // If already subscribed, reuse the existing subscription (some browsers reject calling subscribe() again)
+      const existingSubscription = await registration.pushManager.getSubscription();
+      console.log(
+        "Existing subscription:",
+        existingSubscription ? existingSubscription.endpoint : null
+      );
+
+      if (existingSubscription) {
+        const subscriptionJSON = existingSubscription.toJSON();
+
+        const { error } = await supabase
+          .from("push_subscriptions")
+          .upsert(
+            {
+              user_id: user.id,
+              endpoint: subscriptionJSON.endpoint!,
+              p256dh_key: subscriptionJSON.keys?.p256dh || "",
+              auth_key: subscriptionJSON.keys?.auth || "",
+            },
+            {
+              onConflict: "user_id,endpoint",
+            }
+          );
+
+        if (error) {
+          console.error("Error saving push subscription:", error);
+          toast.error("Failed to save push subscription");
+          return false;
+        }
+
+        setIsPushSubscribed(true);
+        toast.success("Push notifications already enabled!");
+        return true;
+      }
+
       // Subscribe to push
       console.log("Attempting to subscribe to push...");
       const subscription = await registration.pushManager.subscribe({
@@ -275,7 +310,7 @@ export const useNotifications = (): UseNotificationsReturn => {
           toast.error(
             isCapacitorNative()
               ? "Web Push isn't supported inside the native app. Use installable web app (PWA) for Web Push, or set up native push (Firebase)."
-              : "Push subscription was rejected. This usually means the VAPID public key is invalid."
+              : "Push subscription was rejected. If you already enabled push before, disable it first and then re-enable."
           );
           return false;
         }
