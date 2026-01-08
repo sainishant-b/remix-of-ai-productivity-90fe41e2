@@ -120,8 +120,8 @@ export const useNotifications = (): UseNotificationsReturn => {
           }
 
           // Check if already subscribed
-          registration.pushManager
-            .getSubscription()
+          navigator.serviceWorker.ready
+            .then((readyReg) => readyReg.pushManager.getSubscription())
             .then((subscription) => {
               setIsPushSubscribed(!!subscription);
             })
@@ -195,14 +195,37 @@ export const useNotifications = (): UseNotificationsReturn => {
       return false;
     }
 
+    const saveSubscription = async (userId: string, subscription: PushSubscription) => {
+      const subscriptionJSON = subscription.toJSON();
+      const endpoint = subscriptionJSON.endpoint ?? subscription.endpoint;
+
+      return await supabase
+        .from("push_subscriptions")
+        .upsert(
+          {
+            user_id: userId,
+            endpoint,
+            p256dh_key: subscriptionJSON.keys?.p256dh || "",
+            auth_key: subscriptionJSON.keys?.auth || "",
+          },
+          {
+            onConflict: "user_id,endpoint",
+          }
+        );
+    };
+
     try {
       // Get the session first (more reliable than getUser for checking auth state)
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       let user = session?.user;
-      
+
       if (!user) {
         // Try refreshing the session once before giving up
-        const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
+        const {
+          data: { session: refreshedSession },
+        } = await supabase.auth.refreshSession();
         user = refreshedSession?.user ?? null;
         if (!user) {
           toast.error("You must be logged in to enable push notifications");
@@ -231,21 +254,7 @@ export const useNotifications = (): UseNotificationsReturn => {
       );
 
       if (existingSubscription) {
-        const subscriptionJSON = existingSubscription.toJSON();
-
-        const { error } = await supabase
-          .from("push_subscriptions")
-          .upsert(
-            {
-              user_id: user.id,
-              endpoint: subscriptionJSON.endpoint!,
-              p256dh_key: subscriptionJSON.keys?.p256dh || "",
-              auth_key: subscriptionJSON.keys?.auth || "",
-            },
-            {
-              onConflict: "user_id,endpoint",
-            }
-          );
+        const { error } = await saveSubscription(user.id, existingSubscription);
 
         if (error) {
           console.error("Error saving push subscription:", error);
@@ -266,23 +275,9 @@ export const useNotifications = (): UseNotificationsReturn => {
       });
 
       console.log("Push subscription created:", subscription.endpoint);
-      const subscriptionJSON = subscription.toJSON();
 
       // Save subscription to database
-      const { error } = await supabase
-        .from("push_subscriptions")
-        .upsert(
-          {
-            user_id: user.id,
-            endpoint: subscriptionJSON.endpoint!,
-            p256dh_key: subscriptionJSON.keys?.p256dh || "",
-            auth_key: subscriptionJSON.keys?.auth || "",
-          },
-          {
-            onConflict: "user_id,endpoint",
-          }
-        );
-
+      const { error } = await saveSubscription(user.id, subscription);
       if (error) {
         console.error("Error saving push subscription:", error);
         toast.error("Failed to save push subscription");
@@ -297,7 +292,7 @@ export const useNotifications = (): UseNotificationsReturn => {
       console.error("Error subscribing to push - full object:", error);
       console.error("Error type:", typeof error);
       console.error("Error constructor:", error?.constructor?.name);
-      
+
       if (error instanceof DOMException) {
         console.error("DOMException details:", {
           name: error.name,
@@ -306,11 +301,47 @@ export const useNotifications = (): UseNotificationsReturn => {
           stack: error.stack,
         });
 
+        // Some browsers end up creating a subscription even when subscribe() throws.
+        if (error.name === "AbortError" || error.name === "InvalidStateError") {
+          try {
+            const {
+              data: { session },
+            } = await supabase.auth.getSession();
+            const userId = session?.user?.id;
+
+            if (userId) {
+              const reg = await navigator.serviceWorker.ready;
+              const sub = await reg.pushManager.getSubscription();
+              if (sub) {
+                const { error: saveError } = await supabase
+                  .from("push_subscriptions")
+                  .upsert(
+                    {
+                      user_id: userId,
+                      endpoint: sub.endpoint,
+                      p256dh_key: sub.toJSON().keys?.p256dh || "",
+                      auth_key: sub.toJSON().keys?.auth || "",
+                    },
+                    { onConflict: "user_id,endpoint" }
+                  );
+
+                if (!saveError) {
+                  setIsPushSubscribed(true);
+                  toast.success("Push notifications enabled!");
+                  return true;
+                }
+              }
+            }
+          } catch (syncError) {
+            console.warn("Failed to sync push subscription after error:", syncError);
+          }
+        }
+
         if (error.name === "AbortError") {
           toast.error(
             isCapacitorNative()
               ? "Web Push isn't supported inside the native app. Use installable web app (PWA) for Web Push, or set up native push (Firebase)."
-              : "Push subscription was rejected. If you already enabled push before, disable it first and then re-enable."
+              : "Push subscription was rejected by the browser. If you regenerated your push keys, clear site data (or disable notifications for this site) and try again."
           );
           return false;
         }
