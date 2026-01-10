@@ -424,7 +424,11 @@ const Settings = () => {
                         <p className="text-sm text-muted-foreground">
                           Push subscriptions aren't supported in this environment.
                         </p>
-                      ) : null}
+                      ) : (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          💡 <strong>Tip:</strong> If push notifications don't work, enable "Use Google services for push messaging" in your browser settings (Settings → Privacy and security).
+                        </p>
+                      )}
 
                       <div className="text-sm text-muted-foreground space-y-1 border-t pt-4">
                         <p>You'll receive notifications for:</p>
