@@ -148,30 +148,47 @@ export const useNotifications = (): UseNotificationsReturn => {
     if (supported) {
       setPermission(Notification.permission);
 
-      // Register / ensure service worker
-      ensureServiceWorkerRegistration()
-        .then(async (registration) => {
-          console.log("Service Worker registered:", registration);
+      // Check subscription state from ALL service worker registrations (not just ours)
+      const checkSubscriptionState = async () => {
+        if (!pushSupported) {
+          setIsPushSubscribed(false);
+          return;
+        }
+
+        try {
+          // First try our specific SW registration
+          const registration = await ensureServiceWorkerRegistration();
           swRegistrationRef.current = registration;
+          console.log("Service Worker registered:", registration);
 
-          if (!pushSupported) {
-            setIsPushSubscribed(false);
-            return;
+          let subscription = await registration.pushManager.getSubscription();
+          
+          // If not found on our registration, check all registrations (browser may have subscription on different SW)
+          if (!subscription) {
+            const allRegs = await navigator.serviceWorker.getRegistrations();
+            for (const reg of allRegs) {
+              try {
+                const sub = await reg.pushManager.getSubscription();
+                if (sub) {
+                  subscription = sub;
+                  console.log("Found subscription on different SW registration");
+                  break;
+                }
+              } catch {
+                // ignore
+              }
+            }
           }
 
-          // Check if already subscribed (use the same registration we just got)
-          try {
-            const subscription = await registration.pushManager.getSubscription();
-            setIsPushSubscribed(!!subscription);
-          } catch (error) {
-            // Don't mark push as unsupported just because this check failed once.
-            console.warn("Push subscription check failed:", error);
-            setIsPushSubscribed(false);
-          }
-        })
-        .catch((error) => {
-          console.error("Service Worker registration failed:", error);
-        });
+          console.log("Push subscription state on mount:", subscription ? "SUBSCRIBED" : "NOT_SUBSCRIBED");
+          setIsPushSubscribed(!!subscription);
+        } catch (error) {
+          console.warn("Push subscription check failed:", error);
+          setIsPushSubscribed(false);
+        }
+      };
+
+      checkSubscriptionState();
 
       // Listen for messages from service worker (attach once)
       if (!swMessageListenerAttached) {
@@ -310,8 +327,25 @@ export const useNotifications = (): UseNotificationsReturn => {
         return false;
       }
 
-      // If already subscribed, reuse the existing subscription (some browsers reject calling subscribe() again)
-      const existingSubscription = await registration.pushManager.getSubscription();
+      // Check ALL SW registrations for existing subscription (not just ours - browser may have it on a different one)
+      let existingSubscription = await registration.pushManager.getSubscription();
+      
+      if (!existingSubscription) {
+        const allRegs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of allRegs) {
+          try {
+            const sub = await reg.pushManager.getSubscription();
+            if (sub) {
+              existingSubscription = sub;
+              console.log("Found existing subscription on different SW registration");
+              break;
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+
       console.log(
         "Existing subscription:",
         existingSubscription ? existingSubscription.endpoint : null
@@ -327,7 +361,7 @@ export const useNotifications = (): UseNotificationsReturn => {
         }
 
         setIsPushSubscribed(true);
-        toast.success("Push notifications already enabled!");
+        toast.success("Push notifications enabled!");
         return true;
       }
 
