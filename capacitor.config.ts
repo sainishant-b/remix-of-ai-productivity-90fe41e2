@@ -4,10 +4,6 @@ const config: CapacitorConfig = {
   appId: 'ai.productivity',
   appName: 'AI Productivity',
   webDir: 'dist',
-  server: {
-    url: 'https://ca8e63ec-c375-418d-bcdd-5673590b80ff.lovableproject.com?forceHideBadge=true',
-    cleartext: true
-  },
   plugins: {
     StatusBar: {
       style: 'Dark',
