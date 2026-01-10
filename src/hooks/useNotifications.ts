@@ -95,6 +95,41 @@ function isCapacitorNative(): boolean {
 // Prevent concurrent subscribe/unsubscribe operations
 let isProcessingPush = false;
 
+async function ensureServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
+  // Prefer an existing registration for our /sw.js
+  const regs = await navigator.serviceWorker.getRegistrations();
+  const existing = regs.find((r) =>
+    [r.active?.scriptURL, r.installing?.scriptURL, r.waiting?.scriptURL]
+      .filter(Boolean)
+      .some((u) => (u as string).includes("/sw.js"))
+  );
+
+  if (existing) {
+    try {
+      await existing.update();
+    } catch {
+      // ignore transient update failures
+    }
+    return existing;
+  }
+
+  // Force bypassing cached SW when VAPID keys / builds change.
+  return await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
+}
+
+async function resetAppServiceWorkers(): Promise<void> {
+  const regs = await navigator.serviceWorker.getRegistrations();
+  await Promise.all(
+    regs
+      .filter((r) =>
+        [r.active?.scriptURL, r.installing?.scriptURL, r.waiting?.scriptURL]
+          .filter(Boolean)
+          .some((u) => (u as string).includes("/sw.js"))
+      )
+      .map((r) => r.unregister())
+  );
+}
+
 export const useNotifications = (): UseNotificationsReturn => {
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
   const [isSupported, setIsSupported] = useState(false);
@@ -113,9 +148,8 @@ export const useNotifications = (): UseNotificationsReturn => {
     if (supported) {
       setPermission(Notification.permission);
 
-      // Register service worker
-      navigator.serviceWorker
-        .register("/sw.js")
+      // Register / ensure service worker
+      ensureServiceWorkerRegistration()
         .then(async (registration) => {
           console.log("Service Worker registered:", registration);
           swRegistrationRef.current = registration;
@@ -259,9 +293,13 @@ export const useNotifications = (): UseNotificationsReturn => {
         }
       }
 
-      // Wait for service worker to be ready
-      console.log("Waiting for service worker...");
-      const registration = await navigator.serviceWorker.ready;
+      // Ensure service worker registration (helps after preview rebuilds / key changes)
+      console.log("Ensuring service worker registration...");
+      const registration = swRegistrationRef.current ?? (await ensureServiceWorkerRegistration());
+      swRegistrationRef.current = registration;
+
+      // Also wait until at least one SW is ready/active
+      await navigator.serviceWorker.ready;
       console.log("Service worker ready for push subscription");
 
       // Validate + convert VAPID key
@@ -299,27 +337,27 @@ export const useNotifications = (): UseNotificationsReturn => {
       console.log("VAPID key (first 20 chars):", VAPID_PUBLIC_KEY.substring(0, 20));
       console.log("VAPID key validation passed, bytes length:", validation.bytes.length);
 
-      const subscribeOnce = () =>
-        registration.pushManager.subscribe({
+      let activeRegistration = registration;
+
+      const subscribeOnce = (reg: ServiceWorkerRegistration) =>
+        reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: validation.bytes,
         });
 
-      let subscription: PushSubscription;
+      let subscription: PushSubscription | undefined;
       const MAX_RETRIES = 3;
-      let lastError: unknown = null;
-      
+
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
           console.log(`Push subscription attempt ${attempt}/${MAX_RETRIES}...`);
-          subscription = await subscribeOnce();
+          subscription = await subscribeOnce(activeRegistration);
           console.log("Push subscription succeeded on attempt", attempt);
           break;
         } catch (e) {
-          lastError = e;
           console.warn(`Push subscription attempt ${attempt} failed:`, e);
-          
-          // AbortError often means push service is temporarily unavailable
+
+          // AbortError often means the browser push backend rejected/failed this request.
           if (e instanceof DOMException && e.name === "AbortError") {
             if (attempt < MAX_RETRIES) {
               const delay = 1500 * attempt; // Exponential backoff: 1.5s, 3s, 4.5s
@@ -327,17 +365,32 @@ export const useNotifications = (): UseNotificationsReturn => {
               await new Promise((r) => setTimeout(r, delay));
               continue;
             }
+
+            // Last resort: reset SW (can get wedged after key changes / stale registrations)
+            console.log("AbortError persisted; resetting service worker and retrying once...");
+            try {
+              await resetAppServiceWorkers();
+              activeRegistration = await ensureServiceWorkerRegistration();
+              swRegistrationRef.current = activeRegistration;
+              await navigator.serviceWorker.ready;
+
+              subscription = await subscribeOnce(activeRegistration);
+              console.log("Push subscription succeeded after service worker reset");
+              break;
+            } catch (resetError) {
+              console.warn("Retry after service worker reset failed:", resetError);
+            }
           }
+
           throw e;
         }
       }
-      
-      if (!subscription!) {
-        // All retries failed with AbortError
+
+      if (!subscription) {
         console.error("All push subscription attempts failed");
         toast.error(
-          "Push service temporarily unavailable. This can happen on localhost or when the push service is busy. Try again in a few moments.",
-          { duration: 6000 }
+          "Push service rejected the subscription. This can be intermittent (browser push backend) or happen after VAPID key changes. Try again in a minute.",
+          { duration: 7000 }
         );
         return false;
       }
@@ -411,18 +464,16 @@ export const useNotifications = (): UseNotificationsReturn => {
             return false;
           }
           
-          // AbortError with "push service error" usually means:
-          // 1. VAPID key pair mismatch (public key doesn't match the private key)
-          // 2. Push service is temporarily unavailable
-          // 3. Testing on localhost with certain browser configurations
-          console.error("AbortError indicates push service rejection. Common causes:");
-          console.error("- VAPID key pair may be invalid or mismatched");
-          console.error("- Push service may be temporarily unavailable");
-          console.error("- Localhost testing may have limitations");
-          
+          // AbortError with "push service error" means the browser's push backend rejected this subscribe call.
+          // HTTPS is required but not sufficient (incognito, privacy browsers, blocked push services, or stale SW state can still cause this).
+          console.error("AbortError indicates push backend rejection. Common causes:");
+          console.error("- Browser/policy blocking push (incognito, Brave shields, enterprise policy)");
+          console.error("- Push backend intermittently unavailable");
+          console.error("- Stale service worker/subscription state after key/app updates");
+
           toast.error(
-            "Push service rejected the subscription. This often happens on localhost or if VAPID keys are misconfigured. Try again or test on a deployed HTTPS site.",
-            { duration: 8000 }
+            "Push service rejected the subscription. Even on HTTPS this can happen if the browser blocks push or the push backend is unavailable. Try again, or clear this site's data and re-enable.",
+            { duration: 9000 }
           );
           return false;
         }
