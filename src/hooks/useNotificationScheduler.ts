@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useLocalNotifications, ScheduledNotification } from "./useLocalNotifications";
 import { supabase } from "@/integrations/supabase/client";
+import { 
+  calculateNotificationSchedule, 
+  calculateAllNotificationSchedules,
+  getNotificationSummary,
+  NotificationSchedule,
+  ScheduledNotificationTime 
+} from "@/utils/notificationDecisionEngine";
 
 interface Task {
   id: string;
@@ -9,6 +16,7 @@ interface Task {
   status: string;
   priority: string;
   estimated_duration?: number | null;
+  category?: string;
 }
 
 interface Profile {
@@ -108,52 +116,115 @@ export const useNotificationScheduler = ({
     console.log(`Scheduled ${notifications.length} check-in reminders`);
   }, [profile, enabled, hasPermission, cancelNotificationsByType, scheduleMultipleNotifications]);
 
-  // Schedule task due reminders
-  const scheduleTaskReminders = useCallback(async () => {
-    if (!enabled || !hasPermission) return;
+  // Track overdue reminder counts per task (max 3 per day for high priority)
+  const overdueReminderCountsRef = useRef<Record<string, number>>({});
+  const lastSmartScheduleRef = useRef<string | null>(null);
 
-    const leadTimeMinutes = settings.reminderLeadTime;
-    const now = new Date();
+  // Schedule task reminders using the smart notification decision engine
+  const scheduleSmartTaskNotifications = useCallback(async () => {
+    if (!enabled || !hasPermission || !profile) return;
 
-    for (const task of tasks) {
-      if (task.status === 'completed' || !task.due_date) continue;
-      
-      // Skip if already scheduled
-      if (scheduledTaskIdsRef.current.has(task.id)) continue;
+    // Create a schedule key to prevent duplicate scheduling
+    const scheduleKey = tasks
+      .filter(t => t.status !== 'completed')
+      .map(t => `${t.id}-${t.due_date}-${t.priority}`)
+      .join('|');
+    
+    if (lastSmartScheduleRef.current === scheduleKey) return;
 
-      const dueDate = new Date(task.due_date);
-      const reminderTime = new Date(dueDate.getTime() - leadTimeMinutes * 60 * 1000);
+    // Cancel existing task notifications
+    await cancelNotificationsByType('task-reminder');
+    await cancelNotificationsByType('advance-notice');
+    await cancelNotificationsByType('overdue');
+    await cancelNotificationsByType('final-reminder');
 
-      // Skip past reminders
-      if (reminderTime <= now) continue;
+    // Calculate notification schedules for all tasks
+    const schedules = calculateAllNotificationSchedules(
+      tasks,
+      {
+        work_hours_start: profile.work_hours_start,
+        work_hours_end: profile.work_hours_end,
+      },
+      overdueReminderCountsRef.current
+    );
 
-      // Format task info for notification
-      const timeStr = dueDate.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        hour12: true 
-      });
-      
-      const durationStr = task.estimated_duration 
-        ? `${task.estimated_duration} min` 
-        : '';
-      
-      const priorityEmoji = task.priority === 'high' ? '🔴' : 
-                           task.priority === 'medium' ? '🟡' : '🟢';
+    const summary = getNotificationSummary(schedules);
+    console.log(`Smart notifications summary:`, summary);
 
-      const bodyParts = [timeStr, durationStr, `${priorityEmoji} ${task.priority}`].filter(Boolean);
+    const allNotifications: Omit<ScheduledNotification, 'id'>[] = [];
 
-      await scheduleNotification({
-        title: `Upcoming: ${task.title}`,
-        body: bodyParts.join(' • '),
-        scheduleAt: reminderTime,
-        type: 'task-reminder',
-        data: { type: 'task-reminder', taskId: task.id },
-      });
+    for (const schedule of schedules) {
+      for (const notif of schedule.notifications) {
+        // Skip if already scheduled this task
+        if (scheduledTaskIdsRef.current.has(`${schedule.taskId}-${notif.type}-${notif.time.getTime()}`)) {
+          continue;
+        }
 
-      scheduledTaskIdsRef.current.add(task.id);
+        // Build notification content based on type
+        let title = '';
+        let body = '';
+        const priorityEmoji = notif.priority === 'high' ? '🔴' : 
+                             notif.priority === 'medium' ? '🟡' : '🟢';
+
+        switch (notif.type) {
+          case 'advance-notice':
+            title = `📅 Upcoming: ${schedule.taskTitle}`;
+            body = `${priorityEmoji} ${notif.reason}`;
+            break;
+          case 'reminder':
+            title = `⏰ Reminder: ${schedule.taskTitle}`;
+            body = `${priorityEmoji} ${notif.reason}`;
+            break;
+          case 'final-reminder':
+            title = `🚨 Starting Soon: ${schedule.taskTitle}`;
+            body = `${priorityEmoji} ${notif.reason}`;
+            break;
+          case 'overdue':
+            title = `⚠️ Overdue: ${schedule.taskTitle}`;
+            body = `${priorityEmoji} ${notif.reason}`;
+            // Track overdue reminder count
+            overdueReminderCountsRef.current[schedule.taskId] = 
+              (overdueReminderCountsRef.current[schedule.taskId] || 0) + 1;
+            break;
+          case 'daily-summary':
+            title = `🎯 High Priority: ${schedule.taskTitle}`;
+            body = `${priorityEmoji} Consider tackling this during your peak energy time`;
+            break;
+          default:
+            title = `📌 ${schedule.taskTitle}`;
+            body = notif.reason;
+        }
+
+        allNotifications.push({
+          title,
+          body,
+          scheduleAt: notif.time,
+          type: notif.type as any,
+          data: { 
+            type: 'task-reminder', 
+            taskId: schedule.taskId,
+            notificationType: notif.type,
+          },
+        });
+
+        scheduledTaskIdsRef.current.add(`${schedule.taskId}-${notif.type}-${notif.time.getTime()}`);
+      }
     }
-  }, [tasks, enabled, hasPermission, settings.reminderLeadTime, scheduleNotification]);
+
+    // Schedule all notifications at once
+    if (allNotifications.length > 0) {
+      await scheduleMultipleNotifications(allNotifications);
+      console.log(`Scheduled ${allNotifications.length} smart task notifications`);
+    }
+
+    lastSmartScheduleRef.current = scheduleKey;
+  }, [tasks, profile, enabled, hasPermission, cancelNotificationsByType, scheduleMultipleNotifications]);
+
+  // Legacy function for backward compatibility
+  const scheduleTaskReminders = useCallback(async () => {
+    // Delegate to smart scheduling
+    await scheduleSmartTaskNotifications();
+  }, [scheduleSmartTaskNotifications]);
 
   // Cancel notification for a specific task (when completed or rescheduled)
   const cancelTaskReminder = useCallback(async (taskId: string) => {
@@ -363,11 +434,23 @@ export const useNotificationScheduler = ({
   return {
     scheduleCheckInReminders,
     scheduleTaskReminders,
+    scheduleSmartTaskNotifications,
     scheduleDailyAINotification,
     scheduleOverdueAlerts,
     scheduleSmartTaskReminders,
     cancelTaskReminder,
     dismissSmartReminder,
     refreshPendingNotifications,
+    // Export the decision engine functions for external use
+    calculateScheduleForTask: (task: Task) => 
+      profile ? calculateNotificationSchedule(task, {
+        work_hours_start: profile.work_hours_start,
+        work_hours_end: profile.work_hours_end,
+      }) : null,
+    getNotificationSummary: () => 
+      profile ? getNotificationSummary(calculateAllNotificationSchedules(tasks, {
+        work_hours_start: profile.work_hours_start,
+        work_hours_end: profile.work_hours_end,
+      })) : null,
   };
 };

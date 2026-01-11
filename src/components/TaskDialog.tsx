@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Minus, Plus, X } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Minus, Plus, X, ChevronDown, Bell } from "lucide-react";
+import { NotificationSchedulePreview } from "./NotificationSchedulePreview";
 
 interface Task {
   id?: string;
@@ -47,6 +49,18 @@ const TaskDialog = ({ open, onClose, onSave, task }: TaskDialogProps) => {
     category: "other",
     progress: 0,
   });
+  const [showNotificationPreview, setShowNotificationPreview] = useState(false);
+
+  // Build a task object for the notification preview
+  const previewTask = useMemo(() => ({
+    id: task?.id || 'preview',
+    title: formData.title || 'New Task',
+    due_date: formData.due_date || null,
+    status: formData.status || 'not_started',
+    priority: formData.priority || 'medium',
+    estimated_duration: formData.estimated_duration,
+    category: formData.category,
+  }), [task?.id, formData.title, formData.due_date, formData.status, formData.priority, formData.estimated_duration, formData.category]);
 
   useEffect(() => {
     if (task) {
@@ -204,6 +218,24 @@ const TaskDialog = ({ open, onClose, onSave, task }: TaskDialogProps) => {
             </div>
             <p className="text-xs text-muted-foreground">Leave empty for tasks without a deadline</p>
           </div>
+
+          {/* Notification Schedule Preview */}
+          <Collapsible open={showNotificationPreview} onOpenChange={setShowNotificationPreview}>
+            <CollapsibleTrigger asChild>
+              <Button type="button" variant="ghost" className="w-full justify-between px-0 hover:bg-transparent">
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <Bell className="h-4 w-4" />
+                  Notification Schedule
+                </span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${showNotificationPreview ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2">
+              <div className="rounded-lg border p-3 bg-muted/30">
+                <NotificationSchedulePreview task={previewTask} />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           {task && (
             <div className="space-y-3">

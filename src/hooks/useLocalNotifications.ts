@@ -8,7 +8,7 @@ export interface ScheduledNotification {
   title: string;
   body: string;
   scheduleAt: Date;
-  type: 'check-in' | 'task-reminder' | 'ai-recommendation' | 'overdue-alert' | 'smart-task';
+  type: 'check-in' | 'task-reminder' | 'ai-recommendation' | 'overdue-alert' | 'smart-task' | 'advance-notice' | 'overdue' | 'final-reminder' | 'daily-summary';
   data?: Record<string, unknown>;
 }
 
@@ -198,6 +198,10 @@ export const useLocalNotifications = (): UseLocalNotificationsReturn => {
       'ai-recommendation': 'aiRecommendations',
       'overdue-alert': 'overdueAlerts',
       'smart-task': 'smartTaskReminders',
+      'advance-notice': 'taskReminders',
+      'overdue': 'overdueAlerts',
+      'final-reminder': 'taskReminders',
+      'daily-summary': 'aiRecommendations',
     };
     
     const settingKey = typeSettings[notification.type];
