@@ -1,1 +1,10 @@
 project_id = "zzwrugobhedcstcpsknz"
+
+[functions.send-push-notification]
+verify_jwt = false
+
+[functions.task-recommendations]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = false
