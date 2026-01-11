@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Clock, Moon, Sun, User, Bell, BellOff, RefreshCw, Smartphone } from "lucide-react";
+import { Clock, Moon, Sun, User, Bell, BellOff, RefreshCw, Smartphone, Mail } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useNativePushNotifications } from "@/hooks/useNativePushNotifications";
@@ -21,6 +21,14 @@ const Settings = () => {
   const [loading, setLoading] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  
+  // Email notification settings
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(false);
+  const [emailFrequency, setEmailFrequency] = useState("daily");
+  const [emailRecommendations, setEmailRecommendations] = useState(true);
+  const [emailOverdueAlerts, setEmailOverdueAlerts] = useState(true);
+  const [emailWeeklyReports, setEmailWeeklyReports] = useState(true);
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
 
   const isEmbeddedPreview = (() => {
     try {
@@ -66,7 +74,7 @@ const Settings = () => {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("work_hours_start, work_hours_end, check_in_frequency")
+      .select("work_hours_start, work_hours_end, check_in_frequency, email_notifications_enabled, email_frequency, email_recommendations, email_overdue_alerts, email_weekly_reports")
       .eq("id", user.id)
       .single();
 
@@ -74,6 +82,11 @@ const Settings = () => {
       setWorkHoursStart(profile.work_hours_start || "09:00");
       setWorkHoursEnd(profile.work_hours_end || "17:00");
       setCheckInFrequency(profile.check_in_frequency || 3);
+      setEmailNotificationsEnabled(profile.email_notifications_enabled ?? false);
+      setEmailFrequency(profile.email_frequency || "daily");
+      setEmailRecommendations(profile.email_recommendations ?? true);
+      setEmailOverdueAlerts(profile.email_overdue_alerts ?? true);
+      setEmailWeeklyReports(profile.email_weekly_reports ?? true);
     }
   };
 
@@ -88,6 +101,11 @@ const Settings = () => {
         work_hours_start: workHoursStart,
         work_hours_end: workHoursEnd,
         check_in_frequency: checkInFrequency,
+        email_notifications_enabled: emailNotificationsEnabled,
+        email_frequency: emailFrequency,
+        email_recommendations: emailRecommendations,
+        email_overdue_alerts: emailOverdueAlerts,
+        email_weekly_reports: emailWeeklyReports,
       })
       .eq("id", user.id);
 
@@ -165,6 +183,45 @@ const Settings = () => {
     } catch (error) {
       console.error("Server push error:", error);
       toast.error(`Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    try {
+      setSendingTestEmail(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("You must be logged in to test email");
+        return;
+      }
+
+      toast.info("Sending test email...");
+
+      const { data, error } = await supabase.functions.invoke("send-email", {
+        body: {
+          userId: user.id,
+          type: "test",
+        },
+      });
+
+      if (error) {
+        console.error("Email send error:", error);
+        toast.error(`Email failed: ${error.message}`);
+        return;
+      }
+
+      console.log("Email response:", data);
+      
+      if (data.sent) {
+        toast.success("Test email sent! Check your inbox.");
+      } else {
+        toast.info(data.message || "Email not sent");
+      }
+    } catch (error) {
+      console.error("Email error:", error);
+      toast.error(`Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setSendingTestEmail(false);
     }
   };
 
@@ -517,6 +574,115 @@ const Settings = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Email Notifications Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-heading flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Email Notifications
+            </CardTitle>
+            <CardDescription>
+              Receive email digests and alerts about your tasks
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="email-toggle" className="text-base">Enable Email Notifications</Label>
+                <p className="text-sm text-muted-foreground">
+                  Receive email updates about tasks and recommendations
+                </p>
+              </div>
+              <Switch
+                id="email-toggle"
+                checked={emailNotificationsEnabled}
+                onCheckedChange={setEmailNotificationsEnabled}
+              />
+            </div>
+
+            {emailNotificationsEnabled && (
+              <>
+                <div className="space-y-3 border-t pt-4">
+                  <Label className="text-base">Email Frequency</Label>
+                  <Select
+                    value={emailFrequency}
+                    onValueChange={setEmailFrequency}
+                  >
+                    <SelectTrigger className="w-full md:w-[280px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Daily digest</SelectItem>
+                      <SelectItem value="weekly">Weekly only</SelectItem>
+                      <SelectItem value="off">Off (only alerts)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-4 border-t pt-4">
+                  <Label className="text-base">Email Types</Label>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="email-recommendations" className="text-sm">AI Recommendations</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Personalized task suggestions based on your patterns
+                      </p>
+                    </div>
+                    <Switch
+                      id="email-recommendations"
+                      checked={emailRecommendations}
+                      onCheckedChange={setEmailRecommendations}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="email-overdue" className="text-sm">Overdue Alerts</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Get notified when tasks become overdue
+                      </p>
+                    </div>
+                    <Switch
+                      id="email-overdue"
+                      checked={emailOverdueAlerts}
+                      onCheckedChange={setEmailOverdueAlerts}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="email-weekly" className="text-sm">Weekly Reports</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Summary of your weekly productivity
+                      </p>
+                    </div>
+                    <Switch
+                      id="email-weekly"
+                      checked={emailWeeklyReports}
+                      onCheckedChange={setEmailWeeklyReports}
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <Button 
+                    onClick={handleTestEmail} 
+                    variant="outline" 
+                    disabled={sendingTestEmail}
+                    className="w-full md:w-auto"
+                  >
+                    {sendingTestEmail ? "Sending..." : "Send Test Email"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Test email will be sent to your account email address
+                  </p>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Scheduled Notifications Settings */}
         <NotificationSettingsCard />

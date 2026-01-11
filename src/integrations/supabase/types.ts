@@ -60,6 +60,11 @@ export type Database = {
           check_in_frequency: number
           created_at: string
           current_streak: number
+          email_frequency: string
+          email_notifications_enabled: boolean
+          email_overdue_alerts: boolean
+          email_recommendations: boolean
+          email_weekly_reports: boolean
           id: string
           last_check_in_date: string | null
           longest_streak: number
@@ -72,6 +77,11 @@ export type Database = {
           check_in_frequency?: number
           created_at?: string
           current_streak?: number
+          email_frequency?: string
+          email_notifications_enabled?: boolean
+          email_overdue_alerts?: boolean
+          email_recommendations?: boolean
+          email_weekly_reports?: boolean
           id: string
           last_check_in_date?: string | null
           longest_streak?: number
@@ -84,6 +94,11 @@ export type Database = {
           check_in_frequency?: number
           created_at?: string
           current_streak?: number
+          email_frequency?: string
+          email_notifications_enabled?: boolean
+          email_overdue_alerts?: boolean
+          email_recommendations?: boolean
+          email_weekly_reports?: boolean
           id?: string
           last_check_in_date?: string | null
           longest_streak?: number
