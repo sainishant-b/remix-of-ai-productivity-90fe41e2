@@ -128,6 +128,46 @@ const Settings = () => {
     });
   };
 
+  const handleTestServerPush = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("You must be logged in to test server push");
+        return;
+      }
+
+      toast.info("Sending server-side push notification...");
+
+      const { data, error } = await supabase.functions.invoke("send-push-notification", {
+        body: {
+          userId: user.id,
+          title: "Server Push Test 🚀",
+          body: "This notification was sent from the server!",
+          data: { type: "test", timestamp: Date.now() },
+        },
+      });
+
+      if (error) {
+        console.error("Server push error:", error);
+        toast.error(`Server push failed: ${error.message}`);
+        return;
+      }
+
+      console.log("Server push response:", data);
+      
+      if (data.sent > 0) {
+        toast.success(`Server push sent to ${data.sent} subscription(s)!`);
+      } else if (data.expired > 0) {
+        toast.warning(`${data.expired} subscription(s) expired and were removed`);
+      } else {
+        toast.info("No active push subscriptions found. Enable Push Notifications first.");
+      }
+    } catch (error) {
+      console.error("Server push error:", error);
+      toast.error(`Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  };
+
   const handlePushToggle = async (enabled: boolean) => {
     if (isNative) {
       if (enabled) {
@@ -443,6 +483,9 @@ const Settings = () => {
                       <div className="flex gap-2 flex-wrap">
                         <Button onClick={handleTestNotification} variant="outline" className="w-full md:w-auto">
                           Send Test Notification
+                        </Button>
+                        <Button onClick={handleTestServerPush} variant="outline" className="w-full md:w-auto">
+                          Test Server Push
                         </Button>
                         <Button onClick={handleResetPush} variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10">
                           Reset Push State
