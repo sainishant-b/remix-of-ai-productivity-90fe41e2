@@ -160,6 +160,18 @@ export default function AIRecommendations({ onTaskUpdate }: AIRecommendationsPro
     }
   };
 
+  // Sanitize warning messages to remove any task IDs/UUIDs
+  const sanitizeMessage = (message: string): string => {
+    // Remove UUID patterns (with or without surrounding text like "id:" or parentheses)
+    const uuidPattern = /\s*\(?id:\s*[a-f0-9-]{8,36}\.{0,3}\)?/gi;
+    const standaloneUuid = /[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi;
+    return message
+      .replace(uuidPattern, '')
+      .replace(standaloneUuid, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
   const activeTasks = recommendations?.recommendedTasks.filter(
     task => !scheduledTasks.has(task.taskId)
   ) || [];
@@ -207,7 +219,7 @@ export default function AIRecommendations({ onTaskUpdate }: AIRecommendationsPro
               className="flex items-center gap-1 md:gap-1.5 px-2 py-1 rounded-md bg-destructive/10 text-destructive text-[10px] md:text-xs"
             >
               {getWarningIcon(warning.type)}
-              <span className="truncate max-w-[150px] md:max-w-[200px]">{warning.message}</span>
+              <span className="truncate max-w-[150px] md:max-w-[200px]">{sanitizeMessage(warning.message)}</span>
             </div>
           ))}
         </div>

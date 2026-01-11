@@ -145,10 +145,12 @@ SMART MATCHING RULES:
 - Respect work hours preferences (${profile?.work_hours_start} to ${profile?.work_hours_end})
 - Balance workload across the day
 
+CRITICAL: In ALL messages and warnings, NEVER include task IDs or UUIDs. Always refer to tasks ONLY by their title. For example, say "Task 'Complete report' is overdue" instead of including any ID.
+
 Always provide:
 1. Top 5 task recommendations for TODAY with specific time slots
 2. Brief, actionable reasoning for each recommendation (1-2 sentences max)
-3. Warnings about: overdue tasks, schedule conflicts, workload concerns
+3. Warnings about: overdue tasks, schedule conflicts, workload concerns (use task titles only, no IDs)
 4. Overall insights about the user's schedule and patterns (2-3 key points)`;
 
     const userPrompt = `Analyze and recommend scheduling for TODAY (${now.toLocaleDateString()}):
@@ -210,12 +212,12 @@ Focus on the top 5 most important tasks for today. Consider energy patterns from
                   },
                   warnings: {
                     type: 'array',
-                    description: 'Important warnings about schedule issues',
+                    description: 'Important warnings about schedule issues. IMPORTANT: Never include task IDs or UUIDs in messages - use task titles only.',
                     items: {
                       type: 'object',
                       properties: {
                         type: { type: 'string', enum: ['overdue', 'conflict', 'overload', 'other'] },
-                        message: { type: 'string' }
+                        message: { type: 'string', description: 'Warning message using task titles only, never include IDs' }
                       },
                       required: ['type', 'message']
                     }

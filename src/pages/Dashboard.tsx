@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Plus, LogOut, Calendar, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
+import { isPast } from "date-fns";
 import CompactTaskCard from "@/components/CompactTaskCard";
 import CompletedTasksSection from "@/components/CompletedTasksSection";
+import OverdueTasksSection from "@/components/OverdueTasksSection";
 import TaskDialog from "@/components/TaskDialog";
 import CheckInModal from "@/components/CheckInModal";
 import AIRecommendations from "@/components/AIRecommendations";
@@ -213,8 +215,16 @@ const Dashboard = () => {
     navigate("/auth");
   };
 
-  const activeTasks = tasks.filter(t => t.status !== "completed");
   const completedTasks = tasks.filter(t => t.status === "completed");
+  const overdueTasks = tasks.filter(t => 
+    t.status !== "completed" && 
+    t.due_date && 
+    isPast(new Date(t.due_date))
+  );
+  const activeTasks = tasks.filter(t => 
+    t.status !== "completed" && 
+    !(t.due_date && isPast(new Date(t.due_date)))
+  );
   const completedCount = completedTasks.length;
 
   return (
@@ -316,6 +326,13 @@ const Dashboard = () => {
             </div>
           ) : (
             <div className="space-y-1.5 md:space-y-2">
+              {/* Overdue tasks section */}
+              <OverdueTasksSection
+                tasks={overdueTasks}
+                onToggleComplete={handleToggleComplete}
+                onClick={(id) => navigate(`/task/${id}`)}
+              />
+              
               {activeTasks.map((task) => (
                 <CompactTaskCard
                   key={task.id}
