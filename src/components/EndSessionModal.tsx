@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Clock, Save, X } from "lucide-react";
+import { useBackButton } from "@/hooks/useBackButton";
 
 interface EndSessionModalProps {
   open: boolean;
@@ -21,6 +22,9 @@ interface EndSessionModalProps {
 const EndSessionModal = ({ open, onClose, durationSeconds, onSave }: EndSessionModalProps) => {
   const [notes, setNotes] = useState("");
   const [nextSteps, setNextSteps] = useState("");
+
+  // Handle Android back button
+  useBackButton(open, onClose);
 
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);

@@ -20,6 +20,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Minus, Plus, X, ChevronDown, Bell } from "lucide-react";
 import { NotificationSchedulePreview } from "./NotificationSchedulePreview";
+import { useBackButton } from "@/hooks/useBackButton";
 
 interface Task {
   id?: string;
@@ -41,6 +42,9 @@ interface TaskDialogProps {
 }
 
 const TaskDialog = ({ open, onClose, onSave, task }: TaskDialogProps) => {
+  // Handle Android back button
+  useBackButton(open, onClose);
+
   const [formData, setFormData] = useState<Partial<Task>>({
     title: "",
     description: "",

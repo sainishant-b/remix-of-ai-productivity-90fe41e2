@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Smile, Frown, Meh, Heart, Zap } from "lucide-react";
+import { useBackButton } from "@/hooks/useBackButton";
 
 interface CheckInModalProps {
   open: boolean;
@@ -23,6 +24,9 @@ const CheckInModal = ({ open, onClose, question, onSubmit }: CheckInModalProps) 
   const [response, setResponse] = useState("");
   const [selectedMood, setSelectedMood] = useState<string | undefined>();
   const [energyLevel, setEnergyLevel] = useState<number | undefined>();
+
+  // Handle Android back button to close modal
+  useBackButton(open, onClose);
 
   const moods = [
     { icon: Heart, label: "Great", value: "great" },

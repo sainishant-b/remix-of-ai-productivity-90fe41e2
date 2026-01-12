@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
+import { App as CapacitorApp } from "@capacitor/app";
 import AppLayout from "./components/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
@@ -16,10 +17,37 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-// Handle notification deep linking
-const NotificationHandler = () => {
+// Handle Android back button and notification deep linking
+const NavigationHandler = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    // Handle Android hardware back button
+    if (Capacitor.isNativePlatform()) {
+      const backButtonListener = CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+        // Dispatch event to close any open modals/dialogs first
+        const closeEvent = new CustomEvent('app-back-button');
+        const handled = !window.dispatchEvent(closeEvent);
+        
+        // If no modal handled it, use browser history
+        if (!handled) {
+          if (canGoBack) {
+            window.history.back();
+          } else if (location.pathname !== '/') {
+            navigate('/');
+          } else {
+            // On home screen with no history - minimize app
+            CapacitorApp.minimizeApp();
+          }
+        }
+      });
+
+      return () => {
+        backButtonListener.then(listener => listener.remove());
+      };
+    }
+  }, [navigate, location.pathname]);
 
   useEffect(() => {
     // Handle URL query params from notification taps
@@ -33,12 +61,10 @@ const NotificationHandler = () => {
     }
 
     if (tab === 'recommendations') {
-      // Already on dashboard, just ensure recommendations section is visible
       console.log("Navigating to recommendations tab");
     }
 
     if (filter === 'overdue') {
-      // Could filter tasks to show overdue only
       console.log("Filtering to overdue tasks");
     }
 
@@ -75,7 +101,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <NotificationHandler />
+        <NavigationHandler />
         <AppLayout>
           <Routes>
             <Route path="/" element={<Dashboard />} />
