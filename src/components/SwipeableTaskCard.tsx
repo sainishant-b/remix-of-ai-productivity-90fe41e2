@@ -314,8 +314,8 @@ const SwipeableTaskCard = ({
       <Card
         ref={cardRef}
         className={cn(
-          "cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 group relative overflow-hidden border-0",
-          isOverdue ? "ring-1 ring-destructive" : ""
+          "cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 group relative overflow-hidden",
+          isOverdue ? "border border-destructive" : "border border-border"
         )}
         style={{
           transform: `translateX(${offsetX}px)`,
