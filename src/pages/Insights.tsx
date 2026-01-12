@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, CheckCircle2, Flame, Trophy, TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
-import { format, startOfYear, endOfYear, eachDayOfInterval, getMonth } from "date-fns";
+import { format, startOfYear, endOfYear, eachDayOfInterval, getMonth, getDate, getDaysInMonth } from "date-fns";
 
 interface TaskCompletionData {
   date: string;
@@ -101,67 +101,32 @@ const Insights = () => {
     return "bg-white dark:bg-white";
   };
 
-  // Group completion data by weeks for the heatmap
-  const getWeeks = () => {
-    const weeks: TaskCompletionData[][] = [];
-    let currentWeek: TaskCompletionData[] = [];
-
-    completionData.forEach((day, index) => {
-      const dayOfWeek = new Date(day.date).getDay();
-
-      if (index === 0) {
-        // Pad the first week with empty days
-        for (let i = 0; i < dayOfWeek; i++) {
-          currentWeek.push({ date: "", count: -1 });
+  // Group completion data by month and day for vertical heatmap
+  const getMonthlyData = () => {
+    const months: { month: number; days: (TaskCompletionData | null)[] }[] = [];
+    
+    for (let m = 0; m < 12; m++) {
+      const daysInMonth = getDaysInMonth(new Date(selectedYear, m, 1));
+      const days: (TaskCompletionData | null)[] = [];
+      
+      for (let d = 1; d <= 31; d++) {
+        if (d <= daysInMonth) {
+          const dateStr = format(new Date(selectedYear, m, d), "yyyy-MM-dd");
+          const dayData = completionData.find(c => c.date === dateStr);
+          days.push(dayData || { date: dateStr, count: 0 });
+        } else {
+          days.push(null);
         }
       }
-
-      currentWeek.push(day);
-
-      if (dayOfWeek === 6) {
-        weeks.push(currentWeek);
-        currentWeek = [];
-      }
-    });
-
-    // Pad the last incomplete week
-    if (currentWeek.length > 0) {
-      while (currentWeek.length < 7) {
-        currentWeek.push({ date: "", count: -1 });
-      }
-      weeks.push(currentWeek);
+      
+      months.push({ month: m, days });
     }
-
-    return weeks;
+    
+    return months;
   };
 
-  // Get month label positions based on actual data
-  const getMonthLabels = () => {
-    const labels: { month: string; position: number }[] = [];
-    let currentMonth = -1;
-    let weekIndex = 0;
-    
-    const weeks = getWeeks();
-    weeks.forEach((week, wIndex) => {
-      week.forEach((day) => {
-        if (day.date) {
-          const month = getMonth(new Date(day.date));
-          if (month !== currentMonth) {
-            currentMonth = month;
-            labels.push({
-              month: format(new Date(day.date), "MMM"),
-              position: wIndex
-            });
-          }
-        }
-      });
-    });
-    
-    return labels;
-  };
-
-  const weeks = getWeeks();
-  const monthLabels = getMonthLabels();
+  const monthlyData = getMonthlyData();
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const currentYear = new Date().getFullYear();
 
   if (loading) {
@@ -175,96 +140,100 @@ const Insights = () => {
   return (
     <div className="flex-1 bg-background overflow-auto">
       <header className="border-b bg-card sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-4 flex items-center gap-4">
+        <div className="container mx-auto px-4 py-3 sm:py-4 flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="font-heading text-2xl font-bold">Insights</h1>
+          <h1 className="font-heading text-xl sm:text-2xl font-bold">Insights</h1>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 space-y-8">
-        {/* Stats Cards */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
+        {/* Stats Cards - Smaller on mobile */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
           <Card className="shadow-[var(--shadow-md)] transition-all duration-300 hover:shadow-[var(--shadow-lg)] hover:-translate-y-1 group">
-            <CardHeader className="pb-3">
-              <CardTitle className="font-heading text-sm font-medium flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-success transition-transform duration-200 group-hover:scale-110" />
-                Total Completed
+            <CardHeader className="pb-1 sm:pb-3 p-3 sm:p-6">
+              <CardTitle className="font-heading text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2">
+                <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-success transition-transform duration-200 group-hover:scale-110" />
+                <span className="hidden sm:inline">Total Completed</span>
+                <span className="sm:hidden">Completed</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-4xl font-bold transition-transform duration-200 group-hover:scale-105">
+            <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+              <p className="text-2xl sm:text-4xl font-bold transition-transform duration-200 group-hover:scale-105">
                 {totalCompleted}
               </p>
-              <p className="text-sm text-muted-foreground mt-1">tasks finished</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1">tasks</p>
             </CardContent>
           </Card>
 
           <Card className="shadow-[var(--shadow-md)] transition-all duration-300 hover:shadow-[var(--shadow-lg)] hover:-translate-y-1 group">
-            <CardHeader className="pb-3">
-              <CardTitle className="font-heading text-sm font-medium flex items-center gap-2">
-                <Flame className="h-4 w-4 text-warning transition-transform duration-200 group-hover:scale-110" />
-                Current Streak
+            <CardHeader className="pb-1 sm:pb-3 p-3 sm:p-6">
+              <CardTitle className="font-heading text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2">
+                <Flame className="h-3 w-3 sm:h-4 sm:w-4 text-warning transition-transform duration-200 group-hover:scale-110" />
+                <span className="hidden sm:inline">Current Streak</span>
+                <span className="sm:hidden">Streak</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-4xl font-bold transition-transform duration-200 group-hover:scale-105">
+            <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+              <p className="text-2xl sm:text-4xl font-bold transition-transform duration-200 group-hover:scale-105">
                 {profile?.current_streak || 0}
               </p>
-              <p className="text-sm text-muted-foreground mt-1">days in a row</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1">days</p>
             </CardContent>
           </Card>
 
           <Card className="shadow-[var(--shadow-md)] transition-all duration-300 hover:shadow-[var(--shadow-lg)] hover:-translate-y-1 group">
-            <CardHeader className="pb-3">
-              <CardTitle className="font-heading text-sm font-medium flex items-center gap-2">
-                <Trophy className="h-4 w-4 text-primary transition-transform duration-200 group-hover:scale-110" />
-                Longest Streak
+            <CardHeader className="pb-1 sm:pb-3 p-3 sm:p-6">
+              <CardTitle className="font-heading text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2">
+                <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-primary transition-transform duration-200 group-hover:scale-110" />
+                <span className="hidden sm:inline">Longest Streak</span>
+                <span className="sm:hidden">Best</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-4xl font-bold transition-transform duration-200 group-hover:scale-105">
+            <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+              <p className="text-2xl sm:text-4xl font-bold transition-transform duration-200 group-hover:scale-105">
                 {profile?.longest_streak || 0}
               </p>
-              <p className="text-sm text-muted-foreground mt-1">personal best</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1">days</p>
             </CardContent>
           </Card>
 
           <Card className="shadow-[var(--shadow-md)] transition-all duration-300 hover:shadow-[var(--shadow-lg)] hover:-translate-y-1 group">
-            <CardHeader className="pb-3">
-              <CardTitle className="font-heading text-sm font-medium flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-accent-foreground transition-transform duration-200 group-hover:scale-110" />
-                This Week
+            <CardHeader className="pb-1 sm:pb-3 p-3 sm:p-6">
+              <CardTitle className="font-heading text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2">
+                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-accent-foreground transition-transform duration-200 group-hover:scale-110" />
+                <span className="hidden sm:inline">This Week</span>
+                <span className="sm:hidden">Week</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-4xl font-bold transition-transform duration-200 group-hover:scale-105">
+            <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+              <p className="text-2xl sm:text-4xl font-bold transition-transform duration-200 group-hover:scale-105">
                 {completionData.slice(-7).reduce((sum, day) => sum + day.count, 0)}
               </p>
-              <p className="text-sm text-muted-foreground mt-1">tasks completed</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1">tasks</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Calendar Heatmap */}
+        {/* Calendar Heatmap - Vertical layout */}
         <Card className="shadow-[var(--shadow-md)]">
-          <CardHeader>
+          <CardHeader className="p-3 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="font-heading text-lg font-semibold">Activity Heatmap</CardTitle>
-                <p className="text-sm text-muted-foreground">Your task completion activity</p>
+                <CardTitle className="font-heading text-base sm:text-lg font-semibold">Activity Heatmap</CardTitle>
+                <p className="text-xs sm:text-sm text-muted-foreground">Your task completion activity</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 sm:gap-2">
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={() => setSelectedYear(selectedYear - 1)}
-                  className="h-8 w-8"
+                  className="h-7 w-7 sm:h-8 sm:w-8"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
-                <span className="font-heading font-semibold text-lg min-w-[60px] text-center">
+                <span className="font-heading font-semibold text-sm sm:text-lg min-w-[50px] sm:min-w-[60px] text-center">
                   {selectedYear}
                 </span>
                 <Button
@@ -272,66 +241,54 @@ const Insights = () => {
                   size="icon"
                   onClick={() => setSelectedYear(selectedYear + 1)}
                   disabled={selectedYear >= currentYear}
-                  className="h-8 w-8"
+                  className="h-7 w-7 sm:h-8 sm:w-8"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-          <div className="overflow-x-auto">
-              <div className="w-full">
-                {/* Month labels */}
-                <div className="flex mb-2 text-xs text-muted-foreground relative h-4">
-                  <div className="w-10" />
-                  <div className="flex-1 relative">
-                    {monthLabels.map((label, i) => (
-                      <span
-                        key={i}
-                        className="absolute"
-                        style={{ left: `${(label.position / weeks.length) * 100}%` }}
-                      >
-                        {label.month}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Heatmap grid */}
-                <div className="flex justify-between">
-                  {/* Day labels */}
-                  <div className="flex flex-col gap-[3px] text-xs text-muted-foreground pr-2 w-8 shrink-0">
-                    <div className="h-[12px]" />
-                    <div className="h-[12px] flex items-center">Mon</div>
-                    <div className="h-[12px]" />
-                    <div className="h-[12px] flex items-center">Wed</div>
-                    <div className="h-[12px]" />
-                    <div className="h-[12px] flex items-center">Fri</div>
-                    <div className="h-[12px]" />
-                  </div>
-                  
-                  {/* Weeks */}
-                  {weeks.map((week, weekIndex) => (
-                    <div key={weekIndex} className="flex flex-col gap-[3px]">
-                      {week.map((day, dayIndex) => (
-                        <div
-                          key={`${weekIndex}-${dayIndex}`}
-                          className={`w-[12px] h-[12px] rounded-sm transition-all duration-200 hover:scale-125 hover:ring-2 hover:ring-primary/50 ${
-                            day.count === -1 ? "bg-transparent" : getHeatmapColor(day.count)
-                          }`}
-                          title={day.date ? `${day.date}: ${day.count} task${day.count !== 1 ? "s" : ""}` : ""}
-                        />
-                      ))}
+          <CardContent className="p-3 sm:p-6 pt-0">
+            <div className="overflow-x-auto">
+              <div className="min-w-[340px]">
+                {/* Day numbers header (1-31) */}
+                <div className="flex gap-[2px] sm:gap-[3px] mb-1 sm:mb-2">
+                  <div className="w-7 sm:w-10 shrink-0" />
+                  {Array.from({ length: 31 }, (_, i) => (
+                    <div
+                      key={i}
+                      className="w-[8px] sm:w-[12px] text-[8px] sm:text-[10px] text-muted-foreground text-center"
+                    >
+                      {(i + 1) % 5 === 0 || i === 0 ? i + 1 : ""}
                     </div>
                   ))}
                 </div>
+
+                {/* Months rows */}
+                {monthlyData.map((monthData) => (
+                  <div key={monthData.month} className="flex gap-[2px] sm:gap-[3px] mb-[2px] sm:mb-[3px]">
+                    {/* Month label */}
+                    <div className="w-7 sm:w-10 text-[10px] sm:text-xs text-muted-foreground flex items-center shrink-0">
+                      {monthNames[monthData.month]}
+                    </div>
+                    {/* Days */}
+                    {monthData.days.map((day, dayIndex) => (
+                      <div
+                        key={dayIndex}
+                        className={`w-[8px] h-[8px] sm:w-[12px] sm:h-[12px] rounded-[2px] sm:rounded-sm transition-all duration-200 hover:scale-125 hover:ring-2 hover:ring-primary/50 ${
+                          day === null ? "bg-transparent" : getHeatmapColor(day.count)
+                        }`}
+                        title={day ? `${day.date}: ${day.count} task${day.count !== 1 ? "s" : ""}` : ""}
+                      />
+                    ))}
+                  </div>
+                ))}
                 
                 {/* Legend */}
-                <div className="flex items-center justify-end gap-2 mt-4 text-xs text-muted-foreground">
+                <div className="flex items-center justify-end gap-1.5 sm:gap-2 mt-3 sm:mt-4 text-[10px] sm:text-xs text-muted-foreground">
                   <span>No tasks</span>
-                  <div className="w-[12px] h-[12px] rounded-sm bg-muted/30" />
-                  <div className="w-[12px] h-[12px] rounded-sm bg-white dark:bg-white" />
+                  <div className="w-[8px] h-[8px] sm:w-[12px] sm:h-[12px] rounded-[2px] sm:rounded-sm bg-muted/30" />
+                  <div className="w-[8px] h-[8px] sm:w-[12px] sm:h-[12px] rounded-[2px] sm:rounded-sm bg-white dark:bg-white" />
                   <span>Completed</span>
                 </div>
               </div>
