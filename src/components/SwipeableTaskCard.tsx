@@ -314,7 +314,7 @@ const SwipeableTaskCard = ({
       <Card
         ref={cardRef}
         className={cn(
-          "cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 group relative overflow-hidden",
+          "cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 group relative overflow-hidden bg-card",
           isOverdue ? "border border-destructive" : "border border-border"
         )}
         style={{
@@ -324,7 +324,7 @@ const SwipeableTaskCard = ({
         onClick={() => !showActionMenu && onClick(task.id)}
         {...swipeHandlers}
       >
-        <div className="relative bg-card">
+        <div className="relative">
           {renderDesktopContent(false)}
           {renderMobileContent(false)}
         </div>
