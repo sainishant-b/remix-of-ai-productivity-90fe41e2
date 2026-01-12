@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, CheckCircle2, Flame, Trophy, TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
-import { format, startOfYear, endOfYear, eachDayOfInterval, getMonth, getDate, getDaysInMonth } from "date-fns";
+import { format, startOfYear, endOfYear, eachDayOfInterval, getMonth } from "date-fns";
 
 interface TaskCompletionData {
   date: string;
@@ -43,7 +43,6 @@ const Insights = () => {
   const fetchData = async () => {
     setLoading(true);
     
-    // Fetch profile for streak data
     const { data: profileData } = await supabase
       .from("profiles")
       .select("*")
@@ -52,7 +51,6 @@ const Insights = () => {
     
     setProfile(profileData);
 
-    // Fetch completed tasks count
     const { count } = await supabase
       .from("tasks")
       .select("*", { count: "exact", head: true })
@@ -60,7 +58,6 @@ const Insights = () => {
     
     setTotalCompleted(count || 0);
 
-    // Fetch task completion data for heatmap (selected year)
     const yearStart = startOfYear(new Date(selectedYear, 0, 1));
     const yearEnd = endOfYear(new Date(selectedYear, 0, 1));
 
@@ -72,7 +69,6 @@ const Insights = () => {
       .lte("completed_at", yearEnd.toISOString())
       .not("completed_at", "is", null);
 
-    // Process tasks into daily counts
     const dailyCounts: Record<string, number> = {};
     tasks?.forEach((task) => {
       if (task.completed_at) {
@@ -81,7 +77,6 @@ const Insights = () => {
       }
     });
 
-    // Create array for ALL days in the year (always show full year)
     const allDays = eachDayOfInterval({ start: yearStart, end: yearEnd });
     const completionArray = allDays.map((day) => {
       const dateStr = format(day, "yyyy-MM-dd");
@@ -101,33 +96,65 @@ const Insights = () => {
     return "bg-white dark:bg-white";
   };
 
-  // Group completion data by month and day for vertical heatmap
-  const getMonthlyData = () => {
-    const months: { month: number; days: (TaskCompletionData | null)[] }[] = [];
-    
-    for (let m = 0; m < 12; m++) {
-      const daysInMonth = getDaysInMonth(new Date(selectedYear, m, 1));
-      const days: (TaskCompletionData | null)[] = [];
-      
-      for (let d = 1; d <= 31; d++) {
-        if (d <= daysInMonth) {
-          const dateStr = format(new Date(selectedYear, m, d), "yyyy-MM-dd");
-          const dayData = completionData.find(c => c.date === dateStr);
-          days.push(dayData || { date: dateStr, count: 0 });
-        } else {
-          days.push(null);
+  // Group completion data by weeks for the horizontal heatmap (desktop)
+  const getWeeks = () => {
+    const weeks: TaskCompletionData[][] = [];
+    let currentWeek: TaskCompletionData[] = [];
+
+    completionData.forEach((day, index) => {
+      const dayOfWeek = new Date(day.date).getDay();
+
+      if (index === 0) {
+        for (let i = 0; i < dayOfWeek; i++) {
+          currentWeek.push({ date: "", count: -1 });
         }
       }
-      
-      months.push({ month: m, days });
+
+      currentWeek.push(day);
+
+      if (dayOfWeek === 6) {
+        weeks.push(currentWeek);
+        currentWeek = [];
+      }
+    });
+
+    if (currentWeek.length > 0) {
+      while (currentWeek.length < 7) {
+        currentWeek.push({ date: "", count: -1 });
+      }
+      weeks.push(currentWeek);
     }
-    
-    return months;
+
+    return weeks;
   };
 
-  const monthlyData = getMonthlyData();
-  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const getMonthLabels = () => {
+    const labels: { month: string; position: number }[] = [];
+    let currentMonth = -1;
+    
+    const weeks = getWeeks();
+    weeks.forEach((week, wIndex) => {
+      week.forEach((day) => {
+        if (day.date) {
+          const month = getMonth(new Date(day.date));
+          if (month !== currentMonth) {
+            currentMonth = month;
+            labels.push({
+              month: format(new Date(day.date), "MMM"),
+              position: wIndex
+            });
+          }
+        }
+      });
+    });
+    
+    return labels;
+  };
+
+  const weeks = getWeeks();
+  const monthLabels = getMonthLabels();
   const currentYear = new Date().getFullYear();
+  const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   if (loading) {
     return (
@@ -149,7 +176,7 @@ const Insights = () => {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
-        {/* Stats Cards - Smaller on mobile */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
           <Card className="shadow-[var(--shadow-md)] transition-all duration-300 hover:shadow-[var(--shadow-lg)] hover:-translate-y-1 group">
             <CardHeader className="pb-1 sm:pb-3 p-3 sm:p-6">
@@ -216,7 +243,7 @@ const Insights = () => {
           </Card>
         </div>
 
-        {/* Calendar Heatmap - Vertical layout */}
+        {/* Calendar Heatmap */}
         <Card className="shadow-[var(--shadow-md)]">
           <CardHeader className="p-3 sm:p-6">
             <div className="flex items-center justify-between">
@@ -249,46 +276,116 @@ const Insights = () => {
             </div>
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0">
-            <div className="overflow-x-auto">
-              <div className="min-w-[340px]">
-                {/* Day numbers header (1-31) */}
-                <div className="flex gap-[2px] sm:gap-[3px] mb-1 sm:mb-2">
-                  <div className="w-7 sm:w-10 shrink-0" />
-                  {Array.from({ length: 31 }, (_, i) => (
+            {/* Desktop Heatmap - Horizontal */}
+            <div className="hidden sm:block overflow-x-auto">
+              <div className="w-full">
+                {/* Month labels */}
+                <div className="flex mb-2 text-xs text-muted-foreground relative h-4">
+                  <div className="w-10" />
+                  <div className="flex-1 relative">
+                    {monthLabels.map((label, i) => (
+                      <span
+                        key={i}
+                        className="absolute"
+                        style={{ left: `${(label.position / weeks.length) * 100}%` }}
+                      >
+                        {label.month}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Heatmap grid */}
+                <div className="flex justify-between">
+                  {/* Day labels */}
+                  <div className="flex flex-col gap-[3px] text-xs text-muted-foreground pr-2 w-8 shrink-0">
+                    <div className="h-[12px]" />
+                    <div className="h-[12px] flex items-center">Mon</div>
+                    <div className="h-[12px]" />
+                    <div className="h-[12px] flex items-center">Wed</div>
+                    <div className="h-[12px]" />
+                    <div className="h-[12px] flex items-center">Fri</div>
+                    <div className="h-[12px]" />
+                  </div>
+                  
+                  {/* Weeks */}
+                  {weeks.map((week, weekIndex) => (
+                    <div key={weekIndex} className="flex flex-col gap-[3px]">
+                      {week.map((day, dayIndex) => (
+                        <div
+                          key={`${weekIndex}-${dayIndex}`}
+                          className={`w-[12px] h-[12px] rounded-sm transition-all duration-200 hover:scale-125 hover:ring-2 hover:ring-primary/50 ${
+                            day.count === -1 ? "bg-transparent" : getHeatmapColor(day.count)
+                          }`}
+                          title={day.date ? `${day.date}: ${day.count} task${day.count !== 1 ? "s" : ""}` : ""}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Legend */}
+                <div className="flex items-center justify-end gap-2 mt-4 text-xs text-muted-foreground">
+                  <span>No tasks</span>
+                  <div className="w-[12px] h-[12px] rounded-sm bg-muted/30" />
+                  <div className="w-[12px] h-[12px] rounded-sm bg-white dark:bg-white" />
+                  <span>Completed</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile Heatmap - Vertical (weeks as rows, days as columns) */}
+            <div className="sm:hidden">
+              <div className="w-full">
+                {/* Day labels header */}
+                <div className="flex gap-[3px] mb-2">
+                  <div className="w-8 shrink-0" />
+                  {dayLabels.map((day, i) => (
                     <div
                       key={i}
-                      className="w-[8px] sm:w-[12px] text-[8px] sm:text-[10px] text-muted-foreground text-center"
+                      className="flex-1 text-[9px] text-muted-foreground text-center"
                     >
-                      {(i + 1) % 5 === 0 || i === 0 ? i + 1 : ""}
+                      {day.slice(0, 1)}
                     </div>
                   ))}
                 </div>
 
-                {/* Months rows */}
-                {monthlyData.map((monthData) => (
-                  <div key={monthData.month} className="flex gap-[2px] sm:gap-[3px] mb-[2px] sm:mb-[3px]">
-                    {/* Month label */}
-                    <div className="w-7 sm:w-10 text-[10px] sm:text-xs text-muted-foreground flex items-center shrink-0">
-                      {monthNames[monthData.month]}
-                    </div>
-                    {/* Days */}
-                    {monthData.days.map((day, dayIndex) => (
-                      <div
-                        key={dayIndex}
-                        className={`w-[8px] h-[8px] sm:w-[12px] sm:h-[12px] rounded-[2px] sm:rounded-sm transition-all duration-200 hover:scale-125 hover:ring-2 hover:ring-primary/50 ${
-                          day === null ? "bg-transparent" : getHeatmapColor(day.count)
-                        }`}
-                        title={day ? `${day.date}: ${day.count} task${day.count !== 1 ? "s" : ""}` : ""}
-                      />
-                    ))}
-                  </div>
-                ))}
+                {/* Weeks as rows */}
+                <div className="flex flex-col gap-[3px]">
+                  {weeks.map((week, weekIndex) => {
+                    // Get month label for first day of week
+                    const firstDayWithDate = week.find(d => d.date);
+                    const showMonth = firstDayWithDate && 
+                      (weekIndex === 0 || 
+                       (weekIndex > 0 && weeks[weekIndex - 1].find(d => d.date) && 
+                        getMonth(new Date(firstDayWithDate.date)) !== getMonth(new Date(weeks[weekIndex - 1].find(d => d.date)!.date))));
+                    
+                    return (
+                      <div key={weekIndex} className="flex gap-[3px] items-center">
+                        {/* Month label */}
+                        <div className="w-8 text-[9px] text-muted-foreground shrink-0">
+                          {showMonth && firstDayWithDate ? format(new Date(firstDayWithDate.date), "MMM") : ""}
+                        </div>
+                        {/* Days */}
+                        {week.map((day, dayIndex) => (
+                          <div
+                            key={`${weekIndex}-${dayIndex}`}
+                            className={`flex-1 aspect-square max-w-[12px] rounded-[2px] transition-all duration-200 ${
+                              day.count === -1 ? "bg-transparent" : getHeatmapColor(day.count)
+                            }`}
+                            title={day.date ? `${day.date}: ${day.count} task${day.count !== 1 ? "s" : ""}` : ""}
+                          />
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
                 
                 {/* Legend */}
-                <div className="flex items-center justify-end gap-1.5 sm:gap-2 mt-3 sm:mt-4 text-[10px] sm:text-xs text-muted-foreground">
+                <div className="flex items-center justify-end gap-1.5 mt-3 text-[10px] text-muted-foreground">
                   <span>No tasks</span>
-                  <div className="w-[8px] h-[8px] sm:w-[12px] sm:h-[12px] rounded-[2px] sm:rounded-sm bg-muted/30" />
-                  <div className="w-[8px] h-[8px] sm:w-[12px] sm:h-[12px] rounded-[2px] sm:rounded-sm bg-white dark:bg-white" />
+                  <div className="w-[10px] h-[10px] rounded-[2px] bg-muted/30" />
+                  <div className="w-[10px] h-[10px] rounded-[2px] bg-white dark:bg-white" />
                   <span>Completed</span>
                 </div>
               </div>
