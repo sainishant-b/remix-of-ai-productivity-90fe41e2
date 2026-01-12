@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, LogOut, Calendar, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { isPast } from "date-fns";
-import CompactTaskCard from "@/components/CompactTaskCard";
+import PrioritySection from "@/components/PrioritySection";
 import CompletedTasksSection from "@/components/CompletedTasksSection";
 import OverdueTasksSection from "@/components/OverdueTasksSection";
 import TaskDialog from "@/components/TaskDialog";
@@ -225,7 +225,47 @@ const Dashboard = () => {
     t.status !== "completed" && 
     !(t.due_date && isPast(new Date(t.due_date)))
   );
+  
+  // Group active tasks by priority
+  const highPriorityTasks = activeTasks.filter(t => t.priority === "high");
+  const mediumPriorityTasks = activeTasks.filter(t => t.priority === "medium");
+  const lowPriorityTasks = activeTasks.filter(t => t.priority === "low");
+  
   const completedCount = completedTasks.length;
+
+  const handleDeleteTask = async (taskId: string) => {
+    const { error } = await supabase
+      .from("tasks")
+      .delete()
+      .eq("id", taskId);
+    
+    if (error) toast.error("Failed to delete task");
+    else toast.success("Task deleted");
+    fetchTasks();
+  };
+
+  const handleSkipTask = async (taskId: string) => {
+    // Skip = move due date to tomorrow
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const { error } = await supabase
+      .from("tasks")
+      .update({ due_date: tomorrow.toISOString() })
+      .eq("id", taskId);
+    
+    if (error) toast.error("Failed to skip task");
+    else toast.success("Task skipped to tomorrow");
+    fetchTasks();
+  };
+
+  const handleRescheduleTask = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      setSelectedTask(task);
+      setShowTaskDialog(true);
+    }
+  };
 
   return (
     <div className="flex-1 overflow-hidden">
@@ -325,22 +365,48 @@ const Dashboard = () => {
               </Button>
             </div>
           ) : (
-            <div className="space-y-1.5 md:space-y-2">
+            <div className="space-y-3 md:space-y-4">
               {/* Overdue tasks section */}
               <OverdueTasksSection
                 tasks={overdueTasks}
                 onToggleComplete={handleToggleComplete}
                 onClick={(id) => navigate(`/task/${id}`)}
+                onSkip={handleSkipTask}
+                onReschedule={handleRescheduleTask}
+                onDelete={handleDeleteTask}
               />
               
-              {activeTasks.map((task) => (
-                <CompactTaskCard
-                  key={task.id}
-                  task={task}
-                  onToggleComplete={handleToggleComplete}
-                  onClick={(id) => navigate(`/task/${id}`)}
-                />
-              ))}
+              {/* Priority sections */}
+              <PrioritySection
+                priority="high"
+                tasks={highPriorityTasks}
+                onToggleComplete={handleToggleComplete}
+                onClick={(id) => navigate(`/task/${id}`)}
+                onSkip={handleSkipTask}
+                onReschedule={handleRescheduleTask}
+                onDelete={handleDeleteTask}
+              />
+              
+              <PrioritySection
+                priority="medium"
+                tasks={mediumPriorityTasks}
+                onToggleComplete={handleToggleComplete}
+                onClick={(id) => navigate(`/task/${id}`)}
+                onSkip={handleSkipTask}
+                onReschedule={handleRescheduleTask}
+                onDelete={handleDeleteTask}
+              />
+              
+              <PrioritySection
+                priority="low"
+                tasks={lowPriorityTasks}
+                onToggleComplete={handleToggleComplete}
+                onClick={(id) => navigate(`/task/${id}`)}
+                onSkip={handleSkipTask}
+                onReschedule={handleRescheduleTask}
+                onDelete={handleDeleteTask}
+                defaultOpen={false}
+              />
 
               {/* Completed tasks section */}
               <CompletedTasksSection
