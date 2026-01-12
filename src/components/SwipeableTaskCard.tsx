@@ -47,9 +47,9 @@ const SwipeableTaskCard = ({
   };
 
   const priorityDotColors = {
-    high: "bg-destructive shadow-[0_0_8px_rgba(239,68,68,0.5)]",
-    medium: "bg-warning shadow-[0_0_8px_rgba(234,179,8,0.5)]",
-    low: "bg-success shadow-[0_0_8px_rgba(34,197,94,0.5)]",
+    high: "bg-destructive",
+    medium: "bg-warning",
+    low: "bg-success",
   };
 
   const isOverdue = task.due_date && isPast(new Date(task.due_date)) && task.status !== "completed";
@@ -166,15 +166,18 @@ const SwipeableTaskCard = ({
 
   const renderMobileContent = (inverted: boolean) => (
     <div className="sm:hidden px-3 py-2.5">
-      {/* First line: Priority dot, Title, Expand button */}
+      {/* First line: Checkbox, Title, Priority dot, Expand button */}
       <div className="flex items-center gap-2">
-        {/* Priority dot instead of checkbox on mobile */}
-        <div 
-          className={cn(
-            "shrink-0 w-2.5 h-2.5 rounded-full",
-            inverted ? "bg-primary-foreground/60" : priorityDotColors[task.priority]
-          )}
+        {/* Checkbox on the left */}
+        <Checkbox
+          checked={task.status === "completed"}
+          onCheckedChange={() => onToggleComplete(task.id, task.status)}
           onClick={(e) => e.stopPropagation()}
+          className={`shrink-0 h-4 w-4 ${
+            inverted 
+              ? "border-primary-foreground data-[state=checked]:bg-primary-foreground data-[state=checked]:text-primary" 
+              : "border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+          }`}
         />
         <span
           className={`flex-1 font-medium text-sm truncate ${
@@ -183,6 +186,13 @@ const SwipeableTaskCard = ({
         >
           {task.title}
         </span>
+        {/* Priority dot on the right */}
+        <div 
+          className={cn(
+            "shrink-0 w-2.5 h-2.5 rounded-full",
+            inverted ? "bg-primary-foreground/60" : priorityDotColors[task.priority]
+          )}
+        />
         <button
           onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
           className={`p-1 rounded ${inverted ? "text-primary-foreground/70" : "text-muted-foreground"}`}
