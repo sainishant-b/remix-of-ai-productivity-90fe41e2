@@ -207,7 +207,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {showBottomNav && user && !isMobile && (
         <TooltipProvider delayDuration={0}>
           <aside 
-            className={`flex flex-col bg-background border-r border-border py-4 px-2 gap-2 shrink-0 transition-all duration-300 ${
+            className={`sticky top-0 h-screen flex flex-col bg-background border-r border-border py-4 px-2 gap-2 shrink-0 transition-all duration-300 ${
               sidebarExpanded ? "w-48 items-stretch" : "w-14 items-center"
             }`}
           >
