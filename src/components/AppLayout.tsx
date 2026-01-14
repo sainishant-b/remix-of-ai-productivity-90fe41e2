@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { StatusBar, Style } from "@capacitor/status-bar";
+import { Menu, X, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import MobileBottomNav from "./MobileBottomNav";
 import CheckInModal from "./CheckInModal";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +18,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [showCheckIn, setShowCheckIn] = useState(false);
+  const [showNav, setShowNav] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
 
@@ -113,6 +116,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
     setProfile(data);
   };
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate("/auth");
+  };
+
   const handleCheckInSubmit = async (response: string, mood?: string, energyLevel?: number) => {
     if (!user) return;
     
@@ -177,6 +185,72 @@ export default function AppLayout({ children }: AppLayoutProps) {
         paddingRight: "env(safe-area-inset-right, 0px)",
       }}
     >
+      {/* Global Header - shown on all pages except auth */}
+      {showBottomNav && user && (
+        <header className="border-b bg-card/80 backdrop-blur-md sticky top-0 z-40">
+          <div className="px-3 md:px-4 lg:px-6 py-2 max-w-full flex items-center justify-between">
+            {/* Left side - Menu toggle (desktop/tablet) */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setShowNav(!showNav)} 
+              className="h-10 w-10 hidden md:flex"
+            >
+              {showNav ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+            
+            {/* Spacer for mobile */}
+            <div className="md:hidden" />
+            
+            {/* Right side - Logout */}
+            <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-9 w-9 md:h-10 md:w-10">
+              <LogOut className="h-4 w-4 md:h-5 md:w-5" />
+            </Button>
+          </div>
+        </header>
+      )}
+
+      {/* Left Navigation Panel - Desktop/Tablet */}
+      {showNav && showBottomNav && user && (
+        <div className="hidden md:flex fixed left-0 top-[49px] bottom-0 w-56 bg-card border-r z-30 flex-col p-4 gap-2 animate-in slide-in-from-left duration-200">
+          <Button 
+            variant="ghost" 
+            onClick={() => { navigate("/"); setShowNav(false); }} 
+            className="justify-start h-11 text-sm"
+          >
+            Dashboard
+          </Button>
+          <Button 
+            variant="ghost" 
+            onClick={() => { setShowCheckIn(true); setShowNav(false); }} 
+            className="justify-start h-11 text-sm"
+          >
+            Check-in
+          </Button>
+          <Button 
+            variant="ghost" 
+            onClick={() => { navigate("/calendar"); setShowNav(false); }} 
+            className="justify-start h-11 text-sm"
+          >
+            Calendar
+          </Button>
+          <Button 
+            variant="ghost" 
+            onClick={() => { navigate("/insights"); setShowNav(false); }} 
+            className="justify-start h-11 text-sm"
+          >
+            Insights
+          </Button>
+          <Button 
+            variant="ghost" 
+            onClick={() => { navigate("/settings"); setShowNav(false); }} 
+            className="justify-start h-11 text-sm"
+          >
+            Settings
+          </Button>
+        </div>
+      )}
+
       {children}
       
       {showBottomNav && (

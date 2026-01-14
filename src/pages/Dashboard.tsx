@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Plus, LogOut, Calendar, BarChart3, Menu, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { isPast } from "date-fns";
 import PrioritySection from "@/components/PrioritySection";
@@ -29,7 +29,6 @@ const Dashboard = () => {
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(true);
-  const [showNav, setShowNav] = useState(false);
   const {
     permission
   } = useNotifications();
@@ -193,10 +192,6 @@ const Dashboard = () => {
       }
     }
   };
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate("/auth");
-  };
   const completedTasks = tasks.filter(t => t.status === "completed");
   const overdueTasks = tasks.filter(t => t.status !== "completed" && t.due_date && isPast(new Date(t.due_date)));
   const activeTasks = tasks.filter(t => t.status !== "completed" && !(t.due_date && isPast(new Date(t.due_date))));
@@ -233,63 +228,6 @@ const Dashboard = () => {
     }
   };
   return <div className="flex-1 overflow-hidden">
-      {/* Header */}
-      <header className="border-b bg-card/80 backdrop-blur-md sticky top-0 z-40">
-        <div className="px-3 md:px-4 lg:px-6 py-2 max-w-full flex items-center justify-between">
-          {/* Left side - Menu toggle (desktop/tablet) */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => setShowNav(!showNav)} 
-            className="h-10 w-10 hidden md:flex"
-          >
-            {showNav ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </Button>
-          
-          {/* Spacer for mobile */}
-          <div className="md:hidden" />
-          
-          {/* Right side - Logout */}
-          <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-9 w-9 md:h-10 md:w-10">
-            <LogOut className="h-4 w-4 md:h-5 md:w-5" />
-          </Button>
-        </div>
-      </header>
-
-      {/* Left Navigation Panel - Desktop/Tablet */}
-      {showNav && (
-        <div className="hidden md:flex fixed left-0 top-[49px] bottom-0 w-56 bg-card border-r z-30 flex-col p-4 gap-2 animate-in slide-in-from-left duration-200">
-          <Button 
-            variant="ghost" 
-            onClick={() => { setShowCheckIn(true); setShowNav(false); }} 
-            className="justify-start h-11 text-sm"
-          >
-            Check-in
-          </Button>
-          <Button 
-            variant="ghost" 
-            onClick={() => { navigate("/calendar"); setShowNav(false); }} 
-            className="justify-start h-11 text-sm"
-          >
-            Calendar
-          </Button>
-          <Button 
-            variant="ghost" 
-            onClick={() => { navigate("/insights"); setShowNav(false); }} 
-            className="justify-start h-11 text-sm"
-          >
-            Insights
-          </Button>
-          <Button 
-            variant="ghost" 
-            onClick={() => { navigate("/settings"); setShowNav(false); }} 
-            className="justify-start h-11 text-sm"
-          >
-            Settings
-          </Button>
-        </div>
-      )}
-
       {/* Stats bar for mobile only */}
       <div className="md:hidden">
         <MobileStatsBar streak={profile?.current_streak || 0} completedCount={completedCount} nextCheckIn={formatNextCheckIn()} isWorkHours={isWorkHours} />
