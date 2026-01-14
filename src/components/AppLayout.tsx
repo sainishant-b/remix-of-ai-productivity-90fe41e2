@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
@@ -24,6 +24,12 @@ import MobileBottomNav from "./MobileBottomNav";
 import CheckInModal from "./CheckInModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { 
+  isAnySessionActive, 
+  shouldShowCheckIn, 
+  setLastCheckInTimestamp 
+} from "@/utils/workSessionUtils";
+import { getNotificationSender } from "@/hooks/useNotifications";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -37,6 +43,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
+  const hasTriggeredInitialCheckIn = useRef(false);
+  const hourlyNotificationInterval = useRef<NodeJS.Timeout | null>(null);
 
   const checkInQuestions = [
     "What are you working on right now?",
@@ -150,30 +158,35 @@ export default function AppLayout({ children }: AppLayoutProps) {
       energy_level: energyLevel,
     }]);
 
-    if (!error && profile) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+    if (!error) {
+      // Record the check-in timestamp to prevent showing again within the hour
+      setLastCheckInTimestamp(Date.now());
       
-      const lastCheckIn = profile.last_check_in_date ? new Date(profile.last_check_in_date) : null;
-      if (lastCheckIn) lastCheckIn.setHours(0, 0, 0, 0);
-      
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      
-      if (!lastCheckIn || lastCheckIn.getTime() !== today.getTime()) {
-        let newStreak = 1;
+      if (profile) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         
-        if (lastCheckIn && lastCheckIn.getTime() === yesterday.getTime()) {
-          newStreak = profile.current_streak + 1;
+        const lastCheckIn = profile.last_check_in_date ? new Date(profile.last_check_in_date) : null;
+        if (lastCheckIn) lastCheckIn.setHours(0, 0, 0, 0);
+        
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        if (!lastCheckIn || lastCheckIn.getTime() !== today.getTime()) {
+          let newStreak = 1;
+          
+          if (lastCheckIn && lastCheckIn.getTime() === yesterday.getTime()) {
+            newStreak = profile.current_streak + 1;
+          }
+          
+          await supabase.from("profiles").update({
+            current_streak: newStreak,
+            longest_streak: Math.max(profile.longest_streak, newStreak),
+            last_check_in_date: new Date().toISOString(),
+          }).eq("id", user.id);
+          
+          fetchProfile();
         }
-        
-        await supabase.from("profiles").update({
-          current_streak: newStreak,
-          longest_streak: Math.max(profile.longest_streak, newStreak),
-          last_check_in_date: new Date().toISOString(),
-        }).eq("id", user.id);
-        
-        fetchProfile();
       }
     }
   };
@@ -187,6 +200,70 @@ export default function AppLayout({ children }: AppLayoutProps) {
     window.addEventListener("open-checkin", handleOpenCheckIn);
     return () => window.removeEventListener("open-checkin", handleOpenCheckIn);
   }, []);
+
+  // Show check-in on app open if last check-in was more than 1 hour ago
+  useEffect(() => {
+    if (user && !hasTriggeredInitialCheckIn.current) {
+      hasTriggeredInitialCheckIn.current = true;
+      
+      // Small delay to ensure app is fully loaded
+      const timer = setTimeout(() => {
+        if (shouldShowCheckIn() && !isAnySessionActive()) {
+          setShowCheckIn(true);
+        }
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
+
+  // Send hourly check-in notifications (but not during active sessions)
+  useEffect(() => {
+    if (!user) return;
+
+    const sendHourlyNotification = () => {
+      // Don't send if a session is active
+      if (isAnySessionActive()) {
+        console.log("Skipping check-in notification: session is active");
+        return;
+      }
+
+      // Don't send if check-in was done recently
+      if (!shouldShowCheckIn()) {
+        console.log("Skipping check-in notification: recent check-in exists");
+        return;
+      }
+
+      const notificationSender = getNotificationSender();
+      if (notificationSender) {
+        notificationSender.sendNotification({
+          title: "Time for a check-in! ✨",
+          body: "How's your progress going? Take a moment to reflect.",
+          tag: "hourly-check-in",
+          data: { type: "check-in" },
+        });
+      }
+    };
+
+    // Calculate time until next hour
+    const now = new Date();
+    const msUntilNextHour = (60 - now.getMinutes()) * 60 * 1000 - now.getSeconds() * 1000;
+
+    // Set timeout for first notification at the next hour
+    const initialTimeout = setTimeout(() => {
+      sendHourlyNotification();
+      
+      // Then set interval for every hour
+      hourlyNotificationInterval.current = setInterval(sendHourlyNotification, 60 * 60 * 1000);
+    }, msUntilNextHour);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      if (hourlyNotificationInterval.current) {
+        clearInterval(hourlyNotificationInterval.current);
+      }
+    };
+  }, [user]);
 
   const isActive = (path: string) => location.pathname === path;
 
