@@ -275,22 +275,22 @@ const Dashboard = () => {
           <h1 className="font-heading text-base md:text-lg font-bold tracking-tight truncate">AI Productivity</h1>
           <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
             {/* Desktop/Tablet nav buttons - hidden on mobile */}
-            <Button variant="outline" size="sm" onClick={() => setShowCheckIn(true)} className="text-xs h-8 px-3 rounded-lg hidden md:flex">
+            <Button variant="outline" onClick={() => setShowCheckIn(true)} className="text-sm h-10 px-4 rounded-lg hidden md:flex">
               Check-in
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate("/calendar")} className="text-xs h-8 px-3 rounded-lg hidden md:flex">
-              <Calendar className="h-3.5 w-3.5 mr-1" />
+            <Button variant="outline" onClick={() => navigate("/calendar")} className="text-sm h-10 px-4 rounded-lg hidden md:flex">
+              <Calendar className="h-4 w-4 mr-1.5" />
               Calendar
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate("/insights")} className="text-xs h-8 px-3 rounded-lg hidden md:flex">
-              <BarChart3 className="h-3.5 w-3.5 mr-1" />
+            <Button variant="outline" onClick={() => navigate("/insights")} className="text-sm h-10 px-4 rounded-lg hidden md:flex">
+              <BarChart3 className="h-4 w-4 mr-1.5" />
               Insights
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate("/settings")} className="text-xs h-8 px-3 rounded-lg hidden md:flex">
+            <Button variant="outline" onClick={() => navigate("/settings")} className="text-sm h-10 px-4 rounded-lg hidden md:flex">
               Settings
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-7 w-7 md:h-8 md:w-8">
-              <LogOut className="h-3.5 w-3.5 md:h-4 md:w-4" />
+            <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-9 w-9 md:h-10 md:w-10">
+              <LogOut className="h-4 w-4 md:h-5 md:w-5" />
             </Button>
           </div>
         </div>
