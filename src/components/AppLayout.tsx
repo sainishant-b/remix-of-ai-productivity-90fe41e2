@@ -210,48 +210,62 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </header>
       )}
 
-      {/* Left Navigation Panel - Desktop/Tablet */}
-      {showNav && showBottomNav && user && (
-        <div className="hidden md:flex fixed left-0 top-[49px] bottom-0 w-56 bg-card border-r z-30 flex-col p-4 gap-2 animate-in slide-in-from-left duration-200">
-          <Button 
-            variant={location.pathname === "/" ? "secondary" : "ghost"}
-            onClick={() => navigate("/")} 
-            className={`justify-start h-11 text-sm ${location.pathname === "/" ? "bg-primary/10 text-primary font-medium" : ""}`}
+      {/* Main layout with sidebar */}
+      <div className="flex flex-1">
+        {/* Left Navigation Panel - Desktop/Tablet - pushes content */}
+        {showBottomNav && user && (
+          <aside 
+            className={`hidden md:flex flex-col bg-card border-r p-4 gap-2 shrink-0 transition-all duration-300 ease-in-out ${
+              showNav ? "w-56" : "w-0 p-0 overflow-hidden"
+            }`}
           >
-            Dashboard
-          </Button>
-          <Button 
-            variant="ghost" 
-            onClick={() => setShowCheckIn(true)} 
-            className="justify-start h-11 text-sm"
-          >
-            Check-in
-          </Button>
-          <Button 
-            variant={location.pathname === "/calendar" ? "secondary" : "ghost"}
-            onClick={() => navigate("/calendar")} 
-            className={`justify-start h-11 text-sm ${location.pathname === "/calendar" ? "bg-primary/10 text-primary font-medium" : ""}`}
-          >
-            Calendar
-          </Button>
-          <Button 
-            variant={location.pathname === "/insights" ? "secondary" : "ghost"}
-            onClick={() => navigate("/insights")} 
-            className={`justify-start h-11 text-sm ${location.pathname === "/insights" ? "bg-primary/10 text-primary font-medium" : ""}`}
-          >
-            Insights
-          </Button>
-          <Button 
-            variant={location.pathname === "/settings" ? "secondary" : "ghost"}
-            onClick={() => navigate("/settings")} 
-            className={`justify-start h-11 text-sm ${location.pathname === "/settings" ? "bg-primary/10 text-primary font-medium" : ""}`}
-          >
-            Settings
-          </Button>
-        </div>
-      )}
+            {showNav && (
+              <>
+                <Button 
+                  variant={location.pathname === "/" ? "secondary" : "ghost"}
+                  onClick={() => navigate("/")} 
+                  className={`justify-start h-11 text-sm ${location.pathname === "/" ? "bg-primary/10 text-primary font-medium" : ""}`}
+                >
+                  Dashboard
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setShowCheckIn(true)} 
+                  className="justify-start h-11 text-sm"
+                >
+                  Check-in
+                </Button>
+                <Button 
+                  variant={location.pathname === "/calendar" ? "secondary" : "ghost"}
+                  onClick={() => navigate("/calendar")} 
+                  className={`justify-start h-11 text-sm ${location.pathname === "/calendar" ? "bg-primary/10 text-primary font-medium" : ""}`}
+                >
+                  Calendar
+                </Button>
+                <Button 
+                  variant={location.pathname === "/insights" ? "secondary" : "ghost"}
+                  onClick={() => navigate("/insights")} 
+                  className={`justify-start h-11 text-sm ${location.pathname === "/insights" ? "bg-primary/10 text-primary font-medium" : ""}`}
+                >
+                  Insights
+                </Button>
+                <Button 
+                  variant={location.pathname === "/settings" ? "secondary" : "ghost"}
+                  onClick={() => navigate("/settings")} 
+                  className={`justify-start h-11 text-sm ${location.pathname === "/settings" ? "bg-primary/10 text-primary font-medium" : ""}`}
+                >
+                  Settings
+                </Button>
+              </>
+            )}
+          </aside>
+        )}
 
-      {children}
+        {/* Main content area - expands when sidebar is collapsed */}
+        <main className="flex-1 min-w-0 transition-all duration-300">
+          {children}
+        </main>
+      </div>
       
       {showBottomNav && (
         <MobileBottomNav onCheckIn={() => setShowCheckIn(true)} />
