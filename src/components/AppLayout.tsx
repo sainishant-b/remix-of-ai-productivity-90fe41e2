@@ -5,7 +5,6 @@ import { App } from "@capacitor/app";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { 
   LayoutDashboard, 
-  Plus, 
   User, 
   Calendar, 
   BarChart3, 
@@ -23,9 +22,7 @@ import {
 } from "@/components/ui/tooltip";
 import MobileBottomNav from "./MobileBottomNav";
 import CheckInModal from "./CheckInModal";
-import TaskDialog from "./TaskDialog";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -35,7 +32,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [showCheckIn, setShowCheckIn] = useState(false);
-  const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -192,24 +188,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const handleSaveTask = async (taskData: any) => {
-    if (!user) return;
-    
-    const { error } = await supabase.from("tasks").insert([{
-      ...taskData,
-      user_id: user.id
-    }]);
-    
-    if (error) {
-      toast.error("Failed to create task");
-    } else {
-      toast.success("Task created!");
-      // Dispatch event to refresh tasks in Dashboard
-      window.dispatchEvent(new CustomEvent("tasks-updated"));
-    }
-    setShowTaskDialog(false);
-  };
-
   return (
     <div 
       className="min-h-screen bg-background flex"
@@ -227,7 +205,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {showBottomNav && user && (
         <TooltipProvider delayDuration={0}>
           <aside 
-            className={`hidden md:flex flex-col items-center bg-background border-r border-border py-4 gap-1 shrink-0 transition-all duration-300 ${
+            className={`hidden md:flex flex-col items-center bg-background border-r border-border py-4 px-2 gap-2 shrink-0 transition-all duration-300 ${
               sidebarExpanded ? "w-48" : "w-14"
             }`}
           >
@@ -238,28 +216,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   variant="ghost"
                   size="icon"
                   onClick={() => setSidebarExpanded(!sidebarExpanded)}
-                  className="h-10 w-10 text-muted-foreground hover:text-foreground hover:bg-muted mb-2"
+                  className="h-10 w-10 text-muted-foreground hover:text-foreground hover:bg-muted mb-4"
                 >
                   {sidebarExpanded ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">{sidebarExpanded ? "Collapse" : "Expand"}</TooltipContent>
-            </Tooltip>
-
-            {/* Add Task Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size={sidebarExpanded ? "default" : "icon"}
-                  onClick={() => setShowTaskDialog(true)}
-                  className={`${sidebarExpanded ? "w-full mx-2 justify-start gap-2" : "h-10 w-10"} text-foreground border-border hover:bg-muted`}
-                >
-                  <Plus className="h-5 w-5" />
-                  {sidebarExpanded && <span>Add Task</span>}
-                </Button>
-              </TooltipTrigger>
-              {!sidebarExpanded && <TooltipContent side="right">Add Task</TooltipContent>}
             </Tooltip>
 
             {/* Dashboard */}
@@ -269,7 +231,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   variant="ghost"
                   size={sidebarExpanded ? "default" : "icon"}
                   onClick={() => navigate("/")}
-                  className={`${sidebarExpanded ? "w-full mx-2 justify-start gap-2" : "h-10 w-10"} mt-4 text-muted-foreground hover:text-foreground hover:bg-muted ${
+                  className={`${sidebarExpanded ? "w-full justify-start gap-2" : "h-10 w-10"} text-muted-foreground hover:text-foreground hover:bg-muted ${
                     isActive("/") ? "text-foreground bg-muted" : ""
                   }`}
                 >
@@ -287,7 +249,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   variant="ghost"
                   size={sidebarExpanded ? "default" : "icon"}
                   onClick={() => setShowCheckIn(true)}
-                  className={`${sidebarExpanded ? "w-full mx-2 justify-start gap-2" : "h-10 w-10"} text-muted-foreground hover:text-foreground hover:bg-muted`}
+                  className={`${sidebarExpanded ? "w-full justify-start gap-2" : "h-10 w-10"} text-muted-foreground hover:text-foreground hover:bg-muted`}
                 >
                   <User className="h-5 w-5" />
                   {sidebarExpanded && <span>Check-in</span>}
@@ -303,7 +265,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   variant="ghost"
                   size={sidebarExpanded ? "default" : "icon"}
                   onClick={() => navigate("/calendar")}
-                  className={`${sidebarExpanded ? "w-full mx-2 justify-start gap-2" : "h-10 w-10"} text-muted-foreground hover:text-foreground hover:bg-muted ${
+                  className={`${sidebarExpanded ? "w-full justify-start gap-2" : "h-10 w-10"} text-muted-foreground hover:text-foreground hover:bg-muted ${
                     isActive("/calendar") ? "text-foreground bg-muted" : ""
                   }`}
                 >
@@ -321,7 +283,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   variant="ghost"
                   size={sidebarExpanded ? "default" : "icon"}
                   onClick={() => navigate("/insights")}
-                  className={`${sidebarExpanded ? "w-full mx-2 justify-start gap-2" : "h-10 w-10"} text-muted-foreground hover:text-foreground hover:bg-muted ${
+                  className={`${sidebarExpanded ? "w-full justify-start gap-2" : "h-10 w-10"} text-muted-foreground hover:text-foreground hover:bg-muted ${
                     isActive("/insights") ? "text-foreground bg-muted" : ""
                   }`}
                 >
@@ -339,7 +301,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   variant="ghost"
                   size={sidebarExpanded ? "default" : "icon"}
                   onClick={() => navigate("/settings")}
-                  className={`${sidebarExpanded ? "w-full mx-2 justify-start gap-2" : "h-10 w-10"} text-muted-foreground hover:text-foreground hover:bg-muted ${
+                  className={`${sidebarExpanded ? "w-full justify-start gap-2" : "h-10 w-10"} text-muted-foreground hover:text-foreground hover:bg-muted ${
                     isActive("/settings") ? "text-foreground bg-muted" : ""
                   }`}
                 >
@@ -357,7 +319,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   variant="ghost"
                   size={sidebarExpanded ? "default" : "icon"}
                   onClick={handleSignOut}
-                  className={`${sidebarExpanded ? "w-full mx-2 justify-start gap-2" : "h-10 w-10"} mt-2 text-muted-foreground hover:text-foreground hover:bg-muted`}
+                  className={`${sidebarExpanded ? "w-full justify-start gap-2" : "h-10 w-10"} text-muted-foreground hover:text-foreground hover:bg-muted`}
                 >
                   <LogOut className="h-5 w-5" />
                   {sidebarExpanded && <span>Sign Out</span>}
@@ -383,12 +345,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
         onClose={() => setShowCheckIn(false)}
         question={checkInQuestions[Math.floor(Math.random() * checkInQuestions.length)]}
         onSubmit={handleCheckInSubmit}
-      />
-
-      <TaskDialog
-        open={showTaskDialog}
-        onClose={() => setShowTaskDialog(false)}
-        onSave={handleSaveTask}
       />
     </div>
   );
