@@ -11,8 +11,8 @@ import {
   BarChart3, 
   Settings, 
   LogOut,
-  Square,
-  Copy
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +36,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const navigate = useNavigate();
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showTaskDialog, setShowTaskDialog] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
 
@@ -225,130 +226,144 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Left Icon Sidebar - Desktop/Tablet */}
       {showBottomNav && user && (
         <TooltipProvider delayDuration={0}>
-          <aside className="hidden md:flex flex-col items-center w-14 bg-zinc-900 border-r border-zinc-800 py-4 gap-1 shrink-0">
-            {/* Top toggle icons */}
+          <aside 
+            className={`hidden md:flex flex-col items-center bg-background border-r border-border py-4 gap-1 shrink-0 transition-all duration-300 ${
+              sidebarExpanded ? "w-48" : "w-14"
+            }`}
+          >
+            {/* Toggle expand/collapse */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => navigate("/")}
-                  className={`h-10 w-10 text-zinc-400 hover:text-white hover:bg-zinc-800 ${
-                    isActive("/") ? "text-white bg-zinc-800" : ""
-                  }`}
+                  onClick={() => setSidebarExpanded(!sidebarExpanded)}
+                  className="h-10 w-10 text-muted-foreground hover:text-foreground hover:bg-muted mb-2"
                 >
-                  <Square className="h-5 w-5" />
+                  {sidebarExpanded ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">Dashboard</TooltipContent>
+              <TooltipContent side="right">{sidebarExpanded ? "Collapse" : "Expand"}</TooltipContent>
             </Tooltip>
 
+            {/* Add Task Button */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-10 w-10 text-zinc-400 hover:text-white hover:bg-zinc-800"
-                >
-                  <Copy className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Duplicate</TooltipContent>
-            </Tooltip>
-
-            {/* Add Task Button - Orange accent */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
+                  variant="outline"
+                  size={sidebarExpanded ? "default" : "icon"}
                   onClick={() => setShowTaskDialog(true)}
-                  className="h-10 w-10 mt-2 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-lg"
+                  className={`${sidebarExpanded ? "w-full mx-2 justify-start gap-2" : "h-10 w-10"} text-foreground border-border hover:bg-muted`}
                 >
                   <Plus className="h-5 w-5" />
+                  {sidebarExpanded && <span>Add Task</span>}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">Add Task</TooltipContent>
+              {!sidebarExpanded && <TooltipContent side="right">Add Task</TooltipContent>}
             </Tooltip>
 
-            {/* Navigation icons */}
+            {/* Dashboard */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size={sidebarExpanded ? "default" : "icon"}
+                  onClick={() => navigate("/")}
+                  className={`${sidebarExpanded ? "w-full mx-2 justify-start gap-2" : "h-10 w-10"} mt-4 text-muted-foreground hover:text-foreground hover:bg-muted ${
+                    isActive("/") ? "text-foreground bg-muted" : ""
+                  }`}
+                >
+                  <LayoutDashboard className="h-5 w-5" />
+                  {sidebarExpanded && <span>Dashboard</span>}
+                </Button>
+              </TooltipTrigger>
+              {!sidebarExpanded && <TooltipContent side="right">Dashboard</TooltipContent>}
+            </Tooltip>
+
+            {/* Check-in */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size={sidebarExpanded ? "default" : "icon"}
                   onClick={() => setShowCheckIn(true)}
-                  className="h-10 w-10 mt-2 text-zinc-400 hover:text-white hover:bg-zinc-800"
+                  className={`${sidebarExpanded ? "w-full mx-2 justify-start gap-2" : "h-10 w-10"} text-muted-foreground hover:text-foreground hover:bg-muted`}
                 >
                   <User className="h-5 w-5" />
+                  {sidebarExpanded && <span>Check-in</span>}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">Check-in</TooltipContent>
+              {!sidebarExpanded && <TooltipContent side="right">Check-in</TooltipContent>}
             </Tooltip>
 
+            {/* Calendar */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size={sidebarExpanded ? "default" : "icon"}
                   onClick={() => navigate("/calendar")}
-                  className={`h-10 w-10 text-zinc-400 hover:text-white hover:bg-zinc-800 ${
-                    isActive("/calendar") ? "text-white bg-zinc-800" : ""
+                  className={`${sidebarExpanded ? "w-full mx-2 justify-start gap-2" : "h-10 w-10"} text-muted-foreground hover:text-foreground hover:bg-muted ${
+                    isActive("/calendar") ? "text-foreground bg-muted" : ""
                   }`}
                 >
                   <Calendar className="h-5 w-5" />
+                  {sidebarExpanded && <span>Calendar</span>}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">Calendar</TooltipContent>
+              {!sidebarExpanded && <TooltipContent side="right">Calendar</TooltipContent>}
             </Tooltip>
 
+            {/* Insights */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size={sidebarExpanded ? "default" : "icon"}
                   onClick={() => navigate("/insights")}
-                  className={`h-10 w-10 text-zinc-400 hover:text-white hover:bg-zinc-800 ${
-                    isActive("/insights") ? "text-white bg-zinc-800" : ""
+                  className={`${sidebarExpanded ? "w-full mx-2 justify-start gap-2" : "h-10 w-10"} text-muted-foreground hover:text-foreground hover:bg-muted ${
+                    isActive("/insights") ? "text-foreground bg-muted" : ""
                   }`}
                 >
                   <BarChart3 className="h-5 w-5" />
+                  {sidebarExpanded && <span>Insights</span>}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">Insights</TooltipContent>
+              {!sidebarExpanded && <TooltipContent side="right">Insights</TooltipContent>}
             </Tooltip>
 
+            {/* Settings */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size={sidebarExpanded ? "default" : "icon"}
                   onClick={() => navigate("/settings")}
-                  className={`h-10 w-10 text-zinc-400 hover:text-white hover:bg-zinc-800 ${
-                    isActive("/settings") ? "text-white bg-zinc-800" : ""
+                  className={`${sidebarExpanded ? "w-full mx-2 justify-start gap-2" : "h-10 w-10"} text-muted-foreground hover:text-foreground hover:bg-muted ${
+                    isActive("/settings") ? "text-foreground bg-muted" : ""
                   }`}
                 >
                   <Settings className="h-5 w-5" />
+                  {sidebarExpanded && <span>Settings</span>}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">Settings</TooltipContent>
+              {!sidebarExpanded && <TooltipContent side="right">Settings</TooltipContent>}
             </Tooltip>
 
-            {/* Spacer to push logout to bottom */}
-            <div className="flex-1" />
-
-            {/* Logout at bottom */}
+            {/* Sign Out - directly below Settings */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size={sidebarExpanded ? "default" : "icon"}
                   onClick={handleSignOut}
-                  className="h-10 w-10 text-zinc-400 hover:text-white hover:bg-zinc-800"
+                  className={`${sidebarExpanded ? "w-full mx-2 justify-start gap-2" : "h-10 w-10"} mt-2 text-muted-foreground hover:text-foreground hover:bg-muted`}
                 >
                   <LogOut className="h-5 w-5" />
+                  {sidebarExpanded && <span>Sign Out</span>}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">Sign Out</TooltipContent>
+              {!sidebarExpanded && <TooltipContent side="right">Sign Out</TooltipContent>}
             </Tooltip>
           </aside>
         </TooltipProvider>
