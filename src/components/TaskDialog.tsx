@@ -18,9 +18,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Minus, Plus, X, ChevronDown, Bell } from "lucide-react";
+import { Minus, Plus, X, ChevronDown, Bell, Repeat } from "lucide-react";
 import { NotificationSchedulePreview } from "./NotificationSchedulePreview";
 import { useBackButton } from "@/hooks/useBackButton";
+import { RepeatConfigSheet, RepeatConfig } from "./RepeatConfigSheet";
+import { formatRepeatDescription } from "@/utils/repeatTaskUtils";
 
 interface Task {
   id?: string;
@@ -32,6 +34,14 @@ interface Task {
   estimated_duration?: number;
   category: string;
   progress: number;
+  repeat_enabled?: boolean;
+  repeat_frequency?: number;
+  repeat_unit?: "day" | "week" | "month" | "year";
+  repeat_days_of_week?: number[];
+  repeat_times?: string[];
+  repeat_end_type?: "never" | "on_date" | "after_count";
+  repeat_end_date?: string | null;
+  repeat_end_count?: number | null;
 }
 
 interface TaskDialogProps {
@@ -52,8 +62,10 @@ const TaskDialog = ({ open, onClose, onSave, task }: TaskDialogProps) => {
     status: "not_started",
     category: "other",
     progress: 0,
+    repeat_enabled: false,
   });
   const [showNotificationPreview, setShowNotificationPreview] = useState(false);
+  const [showRepeatConfig, setShowRepeatConfig] = useState(false);
 
   // Build a task object for the notification preview
   const previewTask = useMemo(() => ({
@@ -80,9 +92,44 @@ const TaskDialog = ({ open, onClose, onSave, task }: TaskDialogProps) => {
         status: "not_started",
         category: "other",
         progress: 0,
+        repeat_enabled: false,
       });
     }
   }, [task, open]);
+
+  const handleRepeatSave = (config: RepeatConfig) => {
+    setFormData({
+      ...formData,
+      ...config,
+    });
+  };
+
+  const handleDisableRepeat = () => {
+    setFormData({
+      ...formData,
+      repeat_enabled: false,
+      repeat_frequency: undefined,
+      repeat_unit: undefined,
+      repeat_days_of_week: undefined,
+      repeat_times: undefined,
+      repeat_end_type: undefined,
+      repeat_end_date: undefined,
+      repeat_end_count: undefined,
+    });
+  };
+
+  const repeatDescription = formData.repeat_enabled
+    ? formatRepeatDescription({
+        repeat_enabled: true,
+        repeat_frequency: formData.repeat_frequency || 1,
+        repeat_unit: formData.repeat_unit || "week",
+        repeat_days_of_week: formData.repeat_days_of_week || [],
+        repeat_times: formData.repeat_times || [],
+        repeat_end_type: formData.repeat_end_type || "never",
+        repeat_end_date: formData.repeat_end_date || null,
+        repeat_end_count: formData.repeat_end_count || null,
+      })
+    : "";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,6 +270,45 @@ const TaskDialog = ({ open, onClose, onSave, task }: TaskDialogProps) => {
             <p className="text-xs text-muted-foreground">Leave empty for tasks without a deadline</p>
           </div>
 
+          {/* Repeat Section */}
+          <div className="space-y-2">
+            <Label>Repeat</Label>
+            {formData.repeat_enabled ? (
+              <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/30">
+                <Repeat className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-sm flex-1">{repeatDescription}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowRepeatConfig(true)}
+                  className="text-xs"
+                >
+                  Edit
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleDisableRepeat}
+                  className="h-8 w-8"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => setShowRepeatConfig(true)}
+              >
+                <Repeat className="h-4 w-4 mr-2" />
+                Add repeat schedule
+              </Button>
+            )}
+          </div>
+
           {/* Notification Schedule Preview */}
           <Collapsible open={showNotificationPreview} onOpenChange={setShowNotificationPreview}>
             <CollapsibleTrigger asChild>
@@ -301,6 +387,22 @@ const TaskDialog = ({ open, onClose, onSave, task }: TaskDialogProps) => {
           </div>
         </form>
       </DialogContent>
+
+      <RepeatConfigSheet
+        open={showRepeatConfig}
+        onClose={() => setShowRepeatConfig(false)}
+        onSave={handleRepeatSave}
+        initialConfig={{
+          repeat_enabled: formData.repeat_enabled || false,
+          repeat_frequency: formData.repeat_frequency || 1,
+          repeat_unit: formData.repeat_unit || "week",
+          repeat_days_of_week: formData.repeat_days_of_week || [],
+          repeat_times: formData.repeat_times || ["09:00"],
+          repeat_end_type: formData.repeat_end_type || "never",
+          repeat_end_date: formData.repeat_end_date || null,
+          repeat_end_count: formData.repeat_end_count || null,
+        }}
+      />
     </Dialog>
   );
 };

@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { Calendar, Clock, ChevronDown, ChevronUp, Repeat } from "lucide-react";
 import { format, isPast } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface Task {
   id: string;
@@ -15,6 +16,7 @@ interface Task {
   estimated_duration?: number;
   category: string;
   progress: number;
+  repeat_enabled?: boolean;
 }
 
 interface CompactTaskCardProps {
@@ -50,10 +52,13 @@ const CompactTaskCard = ({ task, onToggleComplete, onClick }: CompactTaskCardPro
       />
       
       <span
-        className={`flex-1 font-medium text-sm truncate ${
+        className={`flex-1 font-medium text-sm truncate flex items-center gap-1.5 ${
           task.status === "completed" ? "line-through opacity-60" : ""
         } ${inverted ? "text-primary-foreground" : "text-foreground"}`}
       >
+        {task.repeat_enabled && (
+          <Repeat className={cn("h-3.5 w-3.5 shrink-0", inverted ? "text-primary-foreground/70" : "text-primary")} />
+        )}
         {task.title}
       </span>
 
@@ -113,10 +118,13 @@ const CompactTaskCard = ({ task, onToggleComplete, onClick }: CompactTaskCardPro
           }`}
         />
         <span
-          className={`flex-1 font-medium text-sm truncate ${
+          className={`flex-1 font-medium text-sm truncate flex items-center gap-1 ${
             task.status === "completed" ? "line-through opacity-60" : ""
           } ${inverted ? "text-primary-foreground" : "text-foreground"}`}
         >
+          {task.repeat_enabled && (
+            <Repeat className={cn("h-3 w-3 shrink-0", inverted ? "text-primary-foreground/70" : "text-primary")} />
+          )}
           {task.title}
         </span>
         <Badge 
