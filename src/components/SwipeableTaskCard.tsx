@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Clock, ChevronDown, ChevronUp, Check, SkipForward, CalendarClock, Trash2 } from "lucide-react";
+import { Calendar, Clock, ChevronDown, ChevronUp, Check, SkipForward, CalendarClock, Trash2, Repeat } from "lucide-react";
 import { format, isPast } from "date-fns";
 import { useSwipeGesture } from "@/hooks/useSwipeGesture";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,7 @@ interface Task {
   estimated_duration?: number;
   category: string;
   progress: number;
+  repeat_enabled?: boolean;
 }
 
 interface SwipeableTaskCardProps {
@@ -94,10 +95,13 @@ const SwipeableTaskCard = ({
       />
       
       <span
-        className={`flex-1 font-medium text-sm truncate ${
+        className={`flex-1 font-medium text-sm truncate flex items-center gap-1.5 ${
           task.status === "completed" ? "line-through opacity-60" : ""
         } ${inverted ? "text-primary-foreground" : "text-foreground"}`}
       >
+        {task.repeat_enabled && (
+          <Repeat className={cn("h-3.5 w-3.5 shrink-0", inverted ? "text-primary-foreground/70" : "text-primary")} />
+        )}
         {task.title}
       </span>
 
@@ -180,10 +184,13 @@ const SwipeableTaskCard = ({
           }`}
         />
         <span
-          className={`flex-1 font-medium text-sm truncate ${
+          className={`flex-1 font-medium text-sm truncate flex items-center gap-1 ${
             task.status === "completed" ? "line-through opacity-60" : ""
           } ${inverted ? "text-primary-foreground" : "text-foreground"}`}
         >
+          {task.repeat_enabled && (
+            <Repeat className={cn("h-3 w-3 shrink-0", inverted ? "text-primary-foreground/70" : "text-primary")} />
+          )}
           {task.title}
         </span>
         {/* Priority dot on the right */}
