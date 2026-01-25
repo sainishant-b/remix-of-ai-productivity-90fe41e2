@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Bell, 
   BellOff, 
@@ -19,38 +20,17 @@ import {
   TestTube,
   RefreshCw,
   Gauge,
-  Ban,
+  Zap,
+  Save,
 } from "lucide-react";
 import { useLocalNotifications } from "@/hooks/useLocalNotifications";
+import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
+import { CustomReminderTimesEditor } from "@/components/CustomReminderTimesEditor";
 import { toast } from "sonner";
-import { 
-  UserNotificationPreferences, 
-  DEFAULT_NOTIFICATION_PREFERENCES 
-} from "@/utils/notificationDecisionEngine";
 
 interface NotificationSettingsCardProps {
   onSettingsChange?: () => void;
 }
-
-// Get/set user notification preferences
-const getUserPreferences = (): UserNotificationPreferences => {
-  try {
-    const stored = localStorage.getItem('userNotificationPreferences');
-    if (stored) {
-      return { ...DEFAULT_NOTIFICATION_PREFERENCES, ...JSON.parse(stored) };
-    }
-  } catch {
-    // Ignore parse errors
-  }
-  return DEFAULT_NOTIFICATION_PREFERENCES;
-};
-
-const saveUserPreferences = (prefs: Partial<UserNotificationPreferences>) => {
-  const current = getUserPreferences();
-  const updated = { ...current, ...prefs };
-  localStorage.setItem('userNotificationPreferences', JSON.stringify(updated));
-  return updated;
-};
 
 export const NotificationSettingsCard = ({ onSettingsChange }: NotificationSettingsCardProps) => {
   const {
@@ -66,8 +46,14 @@ export const NotificationSettingsCard = ({ onSettingsChange }: NotificationSetti
     refreshPendingNotifications,
   } = useLocalNotifications();
 
+  const {
+    preferences,
+    isLoading: prefsLoading,
+    isSaving,
+    updatePreference,
+  } = useNotificationPreferences();
+
   const [localSettings, setLocalSettings] = useState(settings);
-  const [userPrefs, setUserPrefs] = useState<UserNotificationPreferences>(getUserPreferences());
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -81,16 +67,6 @@ export const NotificationSettingsCard = ({ onSettingsChange }: NotificationSetti
     setLocalSettings(newSettings);
     updateSettings({ [key]: value });
     onSettingsChange?.();
-  };
-
-  const handleUserPrefChange = <K extends keyof UserNotificationPreferences>(
-    key: K,
-    value: UserNotificationPreferences[K]
-  ) => {
-    const updated = saveUserPreferences({ [key]: value });
-    setUserPrefs(updated);
-    onSettingsChange?.();
-    toast.success("Notification preference saved");
   };
 
   const handleTestNotification = async () => {
@@ -124,14 +100,6 @@ export const NotificationSettingsCard = ({ onSettingsChange }: NotificationSetti
     if (multiplier <= 1.25) return "Normal";
     if (multiplier <= 1.75) return "Somewhat more";
     return "More aggressive";
-  };
-
-  const togglePriorityDisabled = (priority: 'high' | 'medium' | 'low') => {
-    const current = userPrefs.disabledPriorities;
-    const updated = current.includes(priority)
-      ? current.filter(p => p !== priority)
-      : [...current, priority];
-    handleUserPrefChange('disabledPriorities', updated);
   };
 
   if (!isSupported) {
@@ -289,95 +257,153 @@ export const NotificationSettingsCard = ({ onSettingsChange }: NotificationSetti
               </div>
             </div>
 
-            {/* User Override Settings */}
+            {/* User Notification Schedule Settings */}
             <div className="space-y-4 border-t pt-4">
-              <h4 className="text-sm font-medium flex items-center gap-2">
-                <Gauge className="h-4 w-4" />
-                Smart Notification Settings
-              </h4>
-              
-              {/* Frequency Multiplier */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">Notification Frequency</Label>
-                  <span className="text-sm text-muted-foreground">
-                    {getFrequencyLabel(userPrefs.frequencyMultiplier)}
-                  </span>
-                </div>
-                <Slider
-                  value={[userPrefs.frequencyMultiplier]}
-                  min={0.5}
-                  max={2}
-                  step={0.25}
-                  onValueCommit={(values) => handleUserPrefChange('frequencyMultiplier', values[0])}
-                  className="w-full"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Adjust how many notifications you receive. Lower = fewer, Higher = more.
-                </p>
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium flex items-center gap-2">
+                  <Gauge className="h-4 w-4" />
+                  Your Notification Schedule
+                </h4>
+                {isSaving && (
+                  <Badge variant="secondary" className="text-xs">
+                    <Save className="h-3 w-3 mr-1 animate-pulse" />
+                    Saving...
+                  </Badge>
+                )}
               </div>
 
-              {/* Minimum Lead Time */}
-              <div className="flex items-center gap-4">
-                <Label htmlFor="min-lead-time" className="min-w-fit text-sm">
-                  Minimum lead time
-                </Label>
-                <Select
-                  value={userPrefs.minimumLeadTime.toString()}
-                  onValueChange={(v) => handleUserPrefChange('minimumLeadTime', parseInt(v))}
-                >
-                  <SelectTrigger id="min-lead-time" className="w-[140px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5">5 minutes</SelectItem>
-                    <SelectItem value="10">10 minutes</SelectItem>
-                    <SelectItem value="15">15 minutes</SelectItem>
-                    <SelectItem value="30">30 minutes</SelectItem>
-                    <SelectItem value="60">1 hour</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Don't notify if a task is starting within this time.
-              </p>
+              {prefsLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-3/4" />
+                  <Skeleton className="h-8 w-1/2" />
+                </div>
+              ) : (
+                <>
+                  {/* Frequency Multiplier */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Notification Frequency</Label>
+                      <span className="text-sm text-muted-foreground">
+                        {getFrequencyLabel(preferences.frequency_multiplier)}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[preferences.frequency_multiplier]}
+                      min={0.5}
+                      max={2}
+                      step={0.25}
+                      onValueCommit={(values) => updatePreference('frequency_multiplier', values[0])}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Adjust how many notifications you receive. Lower = fewer, Higher = more.
+                    </p>
+                  </div>
 
-              {/* Disable by Priority */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Ban className="h-4 w-4 text-muted-foreground" />
-                  <Label className="text-sm">Disable notifications by priority</Label>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant={userPrefs.disabledPriorities.includes('high') ? "destructive" : "outline"}
-                    size="sm"
-                    onClick={() => togglePriorityDisabled('high')}
-                    className="text-xs"
-                  >
-                    🔴 High
-                  </Button>
-                  <Button
-                    variant={userPrefs.disabledPriorities.includes('medium') ? "destructive" : "outline"}
-                    size="sm"
-                    onClick={() => togglePriorityDisabled('medium')}
-                    className="text-xs"
-                  >
-                    🟡 Medium
-                  </Button>
-                  <Button
-                    variant={userPrefs.disabledPriorities.includes('low') ? "destructive" : "outline"}
-                    size="sm"
-                    onClick={() => togglePriorityDisabled('low')}
-                    className="text-xs"
-                  >
-                    🟢 Low
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Click to disable automatic notifications for specific priority levels.
-                </p>
-              </div>
+                  {/* Minimum Lead Time */}
+                  <div className="flex items-center gap-4">
+                    <Label htmlFor="min-lead-time" className="min-w-fit text-sm">
+                      Minimum lead time
+                    </Label>
+                    <Select
+                      value={preferences.minimum_lead_time.toString()}
+                      onValueChange={(v) => updatePreference('minimum_lead_time', parseInt(v))}
+                    >
+                      <SelectTrigger id="min-lead-time" className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5 minutes</SelectItem>
+                        <SelectItem value="10">10 minutes</SelectItem>
+                        <SelectItem value="15">15 minutes</SelectItem>
+                        <SelectItem value="30">30 minutes</SelectItem>
+                        <SelectItem value="60">1 hour</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Don't notify if a task is starting within this time.
+                  </p>
+
+                  {/* Enable/Disable by Priority */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-muted-foreground" />
+                      <Label className="text-sm">Enable notifications by priority</Label>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant={preferences.high_priority_enabled ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => updatePreference('high_priority_enabled', !preferences.high_priority_enabled)}
+                        className="text-xs"
+                      >
+                        🔴 High
+                      </Button>
+                      <Button
+                        variant={preferences.medium_priority_enabled ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => updatePreference('medium_priority_enabled', !preferences.medium_priority_enabled)}
+                        className="text-xs"
+                      >
+                        🟡 Medium
+                      </Button>
+                      <Button
+                        variant={preferences.low_priority_enabled ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => updatePreference('low_priority_enabled', !preferences.low_priority_enabled)}
+                        className="text-xs"
+                      >
+                        🟢 Low
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Click to toggle notifications for specific priority levels.
+                    </p>
+                  </div>
+
+                  {/* Custom Reminder Times */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <Label className="text-sm">Custom Reminder Times</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Set when you want to be reminded before tasks are due
+                    </p>
+                    <CustomReminderTimesEditor
+                      times={preferences.custom_reminder_times || []}
+                      onChange={(times) => updatePreference('custom_reminder_times', times)}
+                      maxReminders={5}
+                    />
+                  </div>
+
+                  {/* Peak Energy Time */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-muted-foreground" />
+                      <Label className="text-sm">Peak Energy Time</Label>
+                    </div>
+                    <Select
+                      value={preferences.peak_energy_time}
+                      onValueChange={(v) => updatePreference('peak_energy_time', v)}
+                    >
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="morning">🌅 Morning (8am - 12pm)</SelectItem>
+                        <SelectItem value="afternoon">☀️ Afternoon (12pm - 5pm)</SelectItem>
+                        <SelectItem value="evening">🌙 Evening (5pm - 9pm)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      High priority tasks without deadlines will be scheduled during your peak energy time.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Reminder Lead Time */}
@@ -408,35 +434,45 @@ export const NotificationSettingsCard = ({ onSettingsChange }: NotificationSetti
 
             {/* Quiet Hours */}
             <div className="space-y-2 border-t pt-4">
-              <div className="flex items-center gap-2">
-                <Moon className="h-4 w-4 text-muted-foreground" />
-                <h4 className="text-sm font-medium">Quiet Hours</h4>
-              </div>
-              <p className="text-xs text-muted-foreground mb-3">
-                No notifications will be sent during these hours
-              </p>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="quiet-start" className="text-xs">From</Label>
-                  <Input
-                    id="quiet-start"
-                    type="time"
-                    value={userPrefs.quietHoursStart}
-                    onChange={(e) => handleUserPrefChange('quietHoursStart', e.target.value)}
-                    className="w-[120px]"
-                  />
+                  <Moon className="h-4 w-4 text-muted-foreground" />
+                  <h4 className="text-sm font-medium">Quiet Hours</h4>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="quiet-end" className="text-xs">To</Label>
-                  <Input
-                    id="quiet-end"
-                    type="time"
-                    value={userPrefs.quietHoursEnd}
-                    onChange={(e) => handleUserPrefChange('quietHoursEnd', e.target.value)}
-                    className="w-[120px]"
-                  />
-                </div>
+                <Switch
+                  checked={preferences.quiet_hours_enabled}
+                  onCheckedChange={(v) => updatePreference('quiet_hours_enabled', v)}
+                />
               </div>
+              {preferences.quiet_hours_enabled && (
+                <>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    No notifications will be sent during these hours
+                  </p>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="quiet-start" className="text-xs">From</Label>
+                      <Input
+                        id="quiet-start"
+                        type="time"
+                        value={preferences.quiet_hours_start}
+                        onChange={(e) => updatePreference('quiet_hours_start', e.target.value)}
+                        className="w-[120px]"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="quiet-end" className="text-xs">To</Label>
+                      <Input
+                        id="quiet-end"
+                        type="time"
+                        value={preferences.quiet_hours_end}
+                        onChange={(e) => updatePreference('quiet_hours_end', e.target.value)}
+                        className="w-[120px]"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Actions */}

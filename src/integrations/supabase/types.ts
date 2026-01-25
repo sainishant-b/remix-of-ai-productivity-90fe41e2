@@ -55,6 +55,69 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          created_at: string
+          custom_reminder_times: number[] | null
+          daily_summary_enabled: boolean
+          due_today_reminders_enabled: boolean
+          frequency_multiplier: number
+          high_priority_enabled: boolean
+          id: string
+          low_priority_enabled: boolean
+          medium_priority_enabled: boolean
+          minimum_lead_time: number
+          overdue_reminders_enabled: boolean
+          peak_energy_time: string
+          quiet_hours_enabled: boolean
+          quiet_hours_end: string
+          quiet_hours_start: string
+          upcoming_reminders_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          custom_reminder_times?: number[] | null
+          daily_summary_enabled?: boolean
+          due_today_reminders_enabled?: boolean
+          frequency_multiplier?: number
+          high_priority_enabled?: boolean
+          id?: string
+          low_priority_enabled?: boolean
+          medium_priority_enabled?: boolean
+          minimum_lead_time?: number
+          overdue_reminders_enabled?: boolean
+          peak_energy_time?: string
+          quiet_hours_enabled?: boolean
+          quiet_hours_end?: string
+          quiet_hours_start?: string
+          upcoming_reminders_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          custom_reminder_times?: number[] | null
+          daily_summary_enabled?: boolean
+          due_today_reminders_enabled?: boolean
+          frequency_multiplier?: number
+          high_priority_enabled?: boolean
+          id?: string
+          low_priority_enabled?: boolean
+          medium_priority_enabled?: boolean
+          minimum_lead_time?: number
+          overdue_reminders_enabled?: boolean
+          peak_energy_time?: string
+          quiet_hours_enabled?: boolean
+          quiet_hours_end?: string
+          quiet_hours_start?: string
+          upcoming_reminders_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           check_in_frequency: number
