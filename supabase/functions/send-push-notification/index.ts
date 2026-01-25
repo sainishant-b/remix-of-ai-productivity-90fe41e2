@@ -296,6 +296,60 @@ function derToRaw(der: Uint8Array): Uint8Array {
   return result;
 }
 
+// Send FCM push notification
+async function sendFcmNotification(
+  fcmServerKey: string,
+  token: string,
+  title: string,
+  body: string,
+  data: Record<string, unknown>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch('https://fcm.googleapis.com/fcm/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `key=${fcmServerKey}`,
+      },
+      body: JSON.stringify({
+        to: token,
+        notification: {
+          title,
+          body,
+          sound: 'default',
+          icon: 'ic_launcher',
+          color: '#6366f1',
+        },
+        data: {
+          ...data,
+          click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        },
+        priority: 'high',
+        time_to_live: 86400,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('FCM error response:', errorText);
+      return { success: false, error: errorText };
+    }
+
+    const result = await response.json();
+    console.log('FCM response:', JSON.stringify(result));
+    
+    if (result.failure > 0) {
+      const errorInfo = result.results?.[0]?.error;
+      return { success: false, error: errorInfo || 'FCM delivery failed' };
+    }
+
+    return { success: true };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown FCM error';
+    return { success: false, error: errorMessage };
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -306,26 +360,18 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
     const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
-
-    if (!vapidPublicKey || !vapidPrivateKey) {
-      console.error('VAPID keys not configured');
-      return new Response(
-        JSON.stringify({ error: 'Push notifications not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const fcmServerKey = Deno.env.get('FCM_SERVER_KEY');
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { userId, title, body, data, tag } = await req.json();
 
     console.log(`Sending push notification to user ${userId}: ${title}`);
 
-    // Get user's push subscriptions (web push only, not FCM)
+    // Get ALL user's push subscriptions (both web and FCM)
     const { data: subscriptions, error: subError } = await supabase
       .from('push_subscriptions')
       .select('*')
-      .eq('user_id', userId)
-      .not('endpoint', 'like', 'fcm:%');
+      .eq('user_id', userId);
 
     if (subError) {
       console.error('Error fetching subscriptions:', subError);
@@ -336,7 +382,7 @@ serve(async (req) => {
     }
 
     if (!subscriptions || subscriptions.length === 0) {
-      console.log('No web push subscriptions found for user');
+      console.log('No push subscriptions found for user');
       return new Response(
         JSON.stringify({ message: 'No subscriptions found', sent: 0 }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -352,55 +398,102 @@ serve(async (req) => {
       badge: '/favicon.ico',
     });
 
-    let successCount = 0;
+    let webSuccessCount = 0;
+    let fcmSuccessCount = 0;
     let failCount = 0;
     const expiredSubscriptions: string[] = [];
 
     for (const subscription of subscriptions) {
-      try {
-        console.log(`Processing subscription ${subscription.id} for endpoint: ${subscription.endpoint.substring(0, 50)}...`);
-        
-        // Get the origin from the endpoint URL for VAPID audience
-        const endpointUrl = new URL(subscription.endpoint);
-        const audience = endpointUrl.origin;
-        
-        // Encrypt the payload
-        const { encrypted } = await encryptPayload(
-          payload,
-          subscription.p256dh_key,
-          subscription.auth_key
-        );
-        
-        // Create VAPID JWT for authorization
-        const { token, publicKey } = await createVapidJwt(audience, vapidPublicKey, vapidPrivateKey);
-        
-        const response = await fetch(subscription.endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/octet-stream',
-            'Content-Encoding': 'aes128gcm',
-            'TTL': '86400',
-            'Urgency': 'normal',
-            'Authorization': `vapid t=${token}, k=${publicKey}`,
-          },
-          body: encrypted.buffer as ArrayBuffer,
-        });
-
-        if (response.status === 201 || response.status === 200) {
-          successCount++;
-          console.log(`Successfully sent to subscription ${subscription.id}`);
-        } else if (response.status === 404 || response.status === 410) {
-          expiredSubscriptions.push(subscription.id);
-          console.log(`Subscription ${subscription.id} expired, marking for deletion`);
-        } else {
+      const isFcm = subscription.endpoint.startsWith('fcm:');
+      const isApns = subscription.endpoint.startsWith('apns:');
+      
+      if (isFcm) {
+        // Handle FCM (Android) push
+        if (!fcmServerKey) {
+          console.log('FCM_SERVER_KEY not configured, skipping FCM subscription');
           failCount++;
-          const responseText = await response.text();
-          console.error(`Failed to send to subscription ${subscription.id}: ${response.status} ${responseText}`);
+          continue;
         }
-      } catch (err) {
+
+        const fcmToken = subscription.endpoint.replace('fcm:', '');
+        console.log(`Sending FCM notification to token: ${fcmToken.substring(0, 20)}...`);
+        
+        const result = await sendFcmNotification(
+          fcmServerKey,
+          fcmToken,
+          title,
+          body,
+          data || {}
+        );
+
+        if (result.success) {
+          fcmSuccessCount++;
+          console.log(`Successfully sent FCM notification for subscription ${subscription.id}`);
+        } else {
+          // Check for invalid/expired token errors
+          if (result.error?.includes('NotRegistered') || result.error?.includes('InvalidRegistration')) {
+            expiredSubscriptions.push(subscription.id);
+            console.log(`FCM token expired for subscription ${subscription.id}`);
+          } else {
+            failCount++;
+            console.error(`Failed to send FCM for subscription ${subscription.id}: ${result.error}`);
+          }
+        }
+      } else if (isApns) {
+        // APNs would require Apple Push Notification service setup
+        // For now, log that it's not supported
+        console.log(`APNs subscription ${subscription.id} - server push not implemented yet`);
         failCount++;
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        console.error(`Error sending to subscription ${subscription.id}:`, errorMessage);
+      } else {
+        // Handle Web Push
+        if (!vapidPublicKey || !vapidPrivateKey) {
+          console.log('VAPID keys not configured, skipping web push subscription');
+          failCount++;
+          continue;
+        }
+
+        try {
+          console.log(`Processing web push subscription ${subscription.id} for endpoint: ${subscription.endpoint.substring(0, 50)}...`);
+          
+          const endpointUrl = new URL(subscription.endpoint);
+          const audience = endpointUrl.origin;
+          
+          const { encrypted } = await encryptPayload(
+            payload,
+            subscription.p256dh_key,
+            subscription.auth_key
+          );
+          
+          const { token, publicKey } = await createVapidJwt(audience, vapidPublicKey, vapidPrivateKey);
+          
+          const response = await fetch(subscription.endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/octet-stream',
+              'Content-Encoding': 'aes128gcm',
+              'TTL': '86400',
+              'Urgency': 'high',
+              'Authorization': `vapid t=${token}, k=${publicKey}`,
+            },
+            body: encrypted.buffer as ArrayBuffer,
+          });
+
+          if (response.status === 201 || response.status === 200) {
+            webSuccessCount++;
+            console.log(`Successfully sent web push to subscription ${subscription.id}`);
+          } else if (response.status === 404 || response.status === 410) {
+            expiredSubscriptions.push(subscription.id);
+            console.log(`Web push subscription ${subscription.id} expired, marking for deletion`);
+          } else {
+            failCount++;
+            const responseText = await response.text();
+            console.error(`Failed to send web push to subscription ${subscription.id}: ${response.status} ${responseText}`);
+          }
+        } catch (err) {
+          failCount++;
+          const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+          console.error(`Error sending web push to subscription ${subscription.id}:`, errorMessage);
+        }
       }
     }
 
@@ -421,7 +514,9 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         message: 'Push notifications processed',
-        sent: successCount,
+        sent: webSuccessCount + fcmSuccessCount,
+        webPush: webSuccessCount,
+        fcmPush: fcmSuccessCount,
         failed: failCount,
         expired: expiredSubscriptions.length
       }),
