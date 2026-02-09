@@ -175,7 +175,7 @@ Respond using the validate_proof function.`,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    await serviceClient.rpc("", {}).catch(() => {});
+    // Fetch current profile totals and update
     
     // Fetch current profile totals and update
     const { data: profile } = await serviceClient
