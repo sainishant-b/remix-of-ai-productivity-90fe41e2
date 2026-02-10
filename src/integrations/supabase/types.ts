@@ -382,6 +382,7 @@ export type Database = {
           repeat_streak_longest: number | null
           repeat_times: string[] | null
           repeat_unit: string | null
+          requires_proof: boolean
           status: string
           title: string
           user_id: string
@@ -407,6 +408,7 @@ export type Database = {
           repeat_streak_longest?: number | null
           repeat_times?: string[] | null
           repeat_unit?: string | null
+          requires_proof?: boolean
           status?: string
           title: string
           user_id: string
@@ -432,6 +434,7 @@ export type Database = {
           repeat_streak_longest?: number | null
           repeat_times?: string[] | null
           repeat_unit?: string | null
+          requires_proof?: boolean
           status?: string
           title?: string
           user_id?: string

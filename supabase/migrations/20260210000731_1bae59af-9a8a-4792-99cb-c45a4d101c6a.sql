@@ -1,0 +1,1 @@
+ALTER TABLE public.tasks ADD COLUMN requires_proof boolean NOT NULL DEFAULT false;
