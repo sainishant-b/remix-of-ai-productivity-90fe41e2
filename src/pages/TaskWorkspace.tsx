@@ -22,11 +22,14 @@ import {
   FileText,
   Timer,
   Calendar,
-  Tag
+  Tag,
+  Camera,
+  Star
 } from "lucide-react";
 import CheckInModal from "@/components/CheckInModal";
 import SubtaskList from "@/components/SubtaskList";
 import EndSessionModal from "@/components/EndSessionModal";
+import TaskProofUpload from "@/components/TaskProofUpload";
 import { useWorkSessionTimer } from "@/hooks/useWorkSessionTimer";
 import { format } from "date-fns";
 
@@ -76,6 +79,7 @@ const TaskWorkspace = () => {
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [taskHistory, setTaskHistory] = useState<TaskHistory[]>([]);
   const [workSessions, setWorkSessions] = useState<WorkSession[]>([]);
+  const [taskProofs, setTaskProofs] = useState<any[]>([]);
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showEndSession, setShowEndSession] = useState(false);
   
@@ -103,6 +107,7 @@ const TaskWorkspace = () => {
     loadCheckIns();
     loadTaskHistory();
     loadWorkSessions();
+    loadTaskProofs();
   }, [taskId]);
 
   const loadTask = async () => {
@@ -154,6 +159,16 @@ const TaskWorkspace = () => {
       .eq("task_id", taskId)
       .order("created_at", { ascending: false });
     if (data) setWorkSessions(data);
+  };
+
+  const loadTaskProofs = async () => {
+    if (!taskId) return;
+    const { data } = await supabase
+      .from("task_proofs")
+      .select("*")
+      .eq("task_id", taskId)
+      .order("created_at", { ascending: false });
+    if (data) setTaskProofs(data);
   };
 
   const logTaskChange = async (field: string, oldValue: any, newValue: any, notes?: string) => {
@@ -637,7 +652,31 @@ const TaskWorkspace = () => {
               </CardContent>
             </Card>
 
-            {/* Progress Tracker */}
+            {/* Proof of Completion */}
+            <Card className="rounded-xl border-0 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Camera className="h-4 w-4 text-muted-foreground" />
+                  Proof of Completion
+                  {taskProofs.length > 0 && (
+                    <Badge variant="secondary" className="ml-2 rounded-lg flex items-center gap-1">
+                      <Star className="h-3 w-3" />
+                      {(taskProofs.reduce((sum: number, p: any) => sum + (p.ai_rating || 0), 0) / taskProofs.length).toFixed(1)}/10
+                    </Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TaskProofUpload
+                  taskId={task.id}
+                  taskTitle={task.title}
+                  taskDescription={task.description}
+                  proofs={taskProofs}
+                  onProofAdded={loadTaskProofs}
+                />
+              </CardContent>
+            </Card>
+
             <Card className="rounded-xl border-0 shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
