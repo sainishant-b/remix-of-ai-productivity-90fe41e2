@@ -106,13 +106,7 @@ export function useCalendarAI() {
         }
       }
 
-      // Mark proposals as applied in DB
-      if (proposalId) {
-        await supabase
-          .from("ai_schedule_proposals")
-          .update({ status: "applied", resolved_at: new Date().toISOString() })
-          .eq("id", proposalId);
-      }
+      // Proposals applied locally — no persistent storage needed
 
       toast({
         title: "Schedule Updated",
@@ -128,18 +122,11 @@ export function useCalendarAI() {
   );
 
   const dismissProposals = useCallback(async () => {
-    if (proposalId) {
-      await supabase
-        .from("ai_schedule_proposals")
-        .update({ status: "dismissed", resolved_at: new Date().toISOString() })
-        .eq("id", proposalId);
-    }
-
     setProposals([]);
     setOverallReasoning("");
     setConflicts([]);
     setProposalId(null);
-  }, [proposalId]);
+  }, []);
 
   return {
     requestSchedule,

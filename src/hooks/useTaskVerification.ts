@@ -92,7 +92,7 @@ export function useTaskVerification() {
 
   const getTaskVerifications = async (taskId: string): Promise<TaskVerification[]> => {
     const { data, error } = await supabase
-      .from("task_verifications")
+      .from("task_proofs")
       .select("*")
       .eq("task_id", taskId)
       .order("created_at", { ascending: false });
@@ -101,7 +101,15 @@ export function useTaskVerification() {
       console.error("Failed to fetch verifications:", error);
       return [];
     }
-    return data || [];
+    return (data || []).map((p) => ({
+      id: p.id,
+      task_id: p.task_id,
+      task_title: "",
+      image_path: p.image_url,
+      ai_rating: p.ai_rating || 0,
+      ai_feedback: p.ai_feedback || "",
+      created_at: p.created_at,
+    }));
   };
 
   const getUserVerificationScore = async (): Promise<{
@@ -113,19 +121,18 @@ export function useTaskVerification() {
 
     const { data } = await supabase
       .from("profiles")
-      .select("ai_verification_avg, ai_verification_count")
+      .select("total_ai_rating, total_proofs_submitted")
       .eq("id", user.id)
       .single();
 
-    return {
-      avg: data?.ai_verification_avg || 0,
-      count: data?.ai_verification_count || 0,
-    };
+    const count = data?.total_proofs_submitted || 0;
+    const avg = count > 0 ? (data?.total_ai_rating || 0) / count : 0;
+    return { avg, count };
   };
 
   const getProofImageUrl = (imagePath: string): string => {
     const { data } = supabase.storage
-      .from("task-proofs")
+      .from("proof-images")
       .getPublicUrl(imagePath);
     return data.publicUrl;
   };

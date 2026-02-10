@@ -150,8 +150,10 @@ const Dashboard = () => {
       data
     } = await supabase.from("profiles").select("*").eq("id", user.id).single();
     setProfile(data);
-    setVerificationAvg(data?.ai_verification_avg || 0);
-    setVerificationCount(data?.ai_verification_count || 0);
+    const proofCount = data?.total_proofs_submitted || 0;
+    const proofAvg = proofCount > 0 ? (data?.total_ai_rating || 0) / proofCount : 0;
+    setVerificationAvg(proofAvg);
+    setVerificationCount(proofCount);
   };
   const handleSaveTask = async (taskData: any) => {
     const isNewTask = !selectedTask;
