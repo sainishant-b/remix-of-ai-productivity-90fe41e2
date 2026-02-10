@@ -14,39 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      ai_schedule_proposals: {
-        Row: {
-          ai_reasoning: string | null
-          created_at: string
-          id: string
-          proposal_type: string
-          proposals: Json
-          resolved_at: string | null
-          status: string
-          user_id: string
-        }
-        Insert: {
-          ai_reasoning?: string | null
-          created_at?: string
-          id?: string
-          proposal_type: string
-          proposals: Json
-          resolved_at?: string | null
-          status?: string
-          user_id: string
-        }
-        Update: {
-          ai_reasoning?: string | null
-          created_at?: string
-          id?: string
-          proposal_type?: string
-          proposals?: Json
-          resolved_at?: string | null
-          status?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       check_ins: {
         Row: {
           created_at: string
@@ -153,8 +120,6 @@ export type Database = {
       }
       profiles: {
         Row: {
-          ai_verification_avg: number
-          ai_verification_count: number
           check_in_frequency: number
           created_at: string
           current_streak: number
@@ -174,8 +139,6 @@ export type Database = {
           work_hours_start: string
         }
         Insert: {
-          ai_verification_avg?: number
-          ai_verification_count?: number
           check_in_frequency?: number
           created_at?: string
           current_streak?: number
@@ -195,8 +158,6 @@ export type Database = {
           work_hours_start?: string
         }
         Update: {
-          ai_verification_avg?: number
-          ai_verification_count?: number
           check_in_frequency?: number
           created_at?: string
           current_streak?: number
@@ -320,50 +281,6 @@ export type Database = {
           },
         ]
       }
-      task_verifications: {
-        Row: {
-          ai_feedback: string
-          ai_rating: number
-          created_at: string
-          id: string
-          image_path: string
-          task_description: string | null
-          task_id: string
-          task_title: string
-          user_id: string
-        }
-        Insert: {
-          ai_feedback: string
-          ai_rating: number
-          created_at?: string
-          id?: string
-          image_path: string
-          task_description?: string | null
-          task_id: string
-          task_title: string
-          user_id: string
-        }
-        Update: {
-          ai_feedback?: string
-          ai_rating?: number
-          created_at?: string
-          id?: string
-          image_path?: string
-          task_description?: string | null
-          task_id?: string
-          task_title?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "task_verifications_task_id_fkey"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "tasks"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       task_history: {
         Row: {
           created_at: string
@@ -465,7 +382,6 @@ export type Database = {
           repeat_streak_longest: number | null
           repeat_times: string[] | null
           repeat_unit: string | null
-          requires_proof: boolean
           status: string
           title: string
           user_id: string
@@ -491,7 +407,6 @@ export type Database = {
           repeat_streak_longest?: number | null
           repeat_times?: string[] | null
           repeat_unit?: string | null
-          requires_proof?: boolean
           status?: string
           title: string
           user_id: string
@@ -517,7 +432,6 @@ export type Database = {
           repeat_streak_longest?: number | null
           repeat_times?: string[] | null
           repeat_unit?: string | null
-          requires_proof?: boolean
           status?: string
           title?: string
           user_id?: string
