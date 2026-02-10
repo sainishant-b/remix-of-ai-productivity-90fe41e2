@@ -194,26 +194,12 @@ serve(async (req) => {
       };
     }
 
-    // Store proposals in DB
-    const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: record, error: insertErr } = await serviceClient
-      .from("ai_schedule_proposals")
-      .insert({
-        user_id: user.id,
-        proposal_type: requestType,
-        proposals: result.proposals,
-        ai_reasoning: result.overallReasoning,
-        status: "pending",
-      })
-      .select()
-      .single();
-
-    if (insertErr) throw new Error(`DB insert failed: ${insertErr.message}`);
+    const proposalId = crypto.randomUUID();
 
     return new Response(
       JSON.stringify({
         success: true,
-        id: record.id,
+        id: proposalId,
         proposals: result.proposals,
         overallReasoning: result.overallReasoning,
         conflictsDetected: result.conflictsDetected || [],
